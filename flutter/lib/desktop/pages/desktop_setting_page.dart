@@ -319,9 +319,10 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(translate('Settings'), style: RwText.h1),
+          Text(translate('Settings'), style: rwOf(context).textH1),
           const SizedBox(height: 6),
-          Text(translate('Parameters of this computer'), style: RwText.muted),
+          Text(translate('Parameters of this computer'),
+              style: rwOf(context).textMuted),
         ],
       ),
     );
@@ -329,9 +330,10 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
 
   Widget _horizontalTabs(List<_TabInfo> tabs) {
     return Obx(() {
+      final p = rwOf(context);
       return Container(
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: RwColors.border)),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: p.cardBorder)),
         ),
         child: Row(
           children: tabs.map((tab) {
@@ -350,14 +352,14 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
                   border: Border(
                     bottom: BorderSide(
                       width: 2,
-                      color: selected ? RwColors.accent : Colors.transparent,
+                      color: selected ? p.accent : Colors.transparent,
                     ),
                   ),
                 ),
                 child: Text(
                   translate(tab.label),
                   style: RwText.bodyStrong.copyWith(
-                    color: selected ? RwColors.text : RwColors.muted,
+                    color: selected ? p.text : p.muted,
                   ),
                 ),
               ),
@@ -480,11 +482,12 @@ class _GeneralState extends State<_General> {
     }
 
     final isOptFixed = isOptionFixed(kCommConfKeyTheme);
+    // Theme: Системная / Тёмная / Светлая (system, dark, light)
     return _Card(title: 'Theme', children: [
       _Radio<String>(context,
-          value: 'light',
+          value: 'system',
           groupValue: current,
-          label: 'Light',
+          label: 'Follow System',
           onChanged: isOptFixed ? null : onChanged),
       _Radio<String>(context,
           value: 'dark',
@@ -492,9 +495,9 @@ class _GeneralState extends State<_General> {
           label: 'Dark',
           onChanged: isOptFixed ? null : onChanged),
       _Radio<String>(context,
-          value: 'system',
+          value: 'light',
           groupValue: current,
-          label: 'Follow System',
+          label: 'Light',
           onChanged: isOptFixed ? null : onChanged),
     ]);
   }
@@ -2660,41 +2663,85 @@ Widget _Card(
     {required String title,
     required List<Widget> children,
     List<Widget>? title_suffix}) {
-  return Row(
-    children: [
-      Flexible(
-        child: Container(
-          width: _kCardFixedWidth,
-          margin: const EdgeInsets.only(left: _kCardLeftMargin, top: 15),
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-          decoration: RwDecor.panel,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                      child: Text(
-                    translate(title),
-                    textAlign: TextAlign.start,
-                    style: RwText.h2,
-                  )),
-                  ...?title_suffix
-                ],
-              ).marginOnly(bottom: 6),
-              ...children.map((e) => Container(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    decoration: const BoxDecoration(
-                      border: Border(top: BorderSide(color: RwColors.border)),
-                    ),
-                    child: e,
-                  )),
-            ],
+  return Builder(builder: (context) {
+    final p = rwOf(context);
+    return Row(
+      children: [
+        Flexible(
+          child: _HoverCard(
+            width: _kCardFixedWidth,
+            margin: const EdgeInsets.only(left: _kCardLeftMargin, top: 15),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                        child: Text(
+                      translate(title),
+                      textAlign: TextAlign.start,
+                      style: p.textH2,
+                    )),
+                    ...?title_suffix
+                  ],
+                ).marginOnly(bottom: 6),
+                ...children.map((e) => Container(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      decoration: BoxDecoration(
+                        border:
+                            Border(top: BorderSide(color: p.cardBorder)),
+                      ),
+                      child: e,
+                    )),
+              ],
+            ),
           ),
         ),
+      ],
+    );
+  });
+}
+
+class _HoverCard extends StatefulWidget {
+  final Widget child;
+  final double width;
+  final EdgeInsetsGeometry margin;
+  final EdgeInsetsGeometry padding;
+  const _HoverCard({
+    required this.child,
+    required this.width,
+    required this.margin,
+    required this.padding,
+  });
+
+  @override
+  State<_HoverCard> createState() => _HoverCardState();
+}
+
+class _HoverCardState extends State<_HoverCard> {
+  bool hover = false;
+  bool focus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = rwOf(context);
+    return MouseRegion(
+      onEnter: (_) => setState(() => hover = true),
+      onExit: (_) => setState(() => hover = false),
+      child: Focus(
+        canRequestFocus: false,
+        onFocusChange: (v) => setState(() => focus = v),
+        child: Container(
+          width: widget.width,
+          margin: widget.margin,
+          padding: widget.padding,
+          decoration: RwDecor.panelOf(p, hover: hover, focus: focus),
+          child: widget.child,
+        ),
       ),
-    ],
-  );
+    );
+  }
 }
 
 // ignore: non_constant_identifier_names

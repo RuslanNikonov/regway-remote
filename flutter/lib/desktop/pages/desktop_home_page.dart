@@ -651,16 +651,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     }
 
+    final pal = rwOf(context);
     return Stack(
       children: [
         Container(
           margin: EdgeInsets.fromLTRB(
               0, marginTop, 0, bind.isIncomingOnly() ? marginTop : 0),
           child: Container(
-              decoration: BoxDecoration(
-                  color: RwColors.bg2Fill,
-                  borderRadius: BorderRadius.circular(RwDim.radiusPanel),
-                  border: Border.all(color: RwColors.border)),
+              decoration: RwDecor.panelOf(pal),
               padding: EdgeInsets.all(20),
               child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -670,10 +668,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                               Center(
                                   child: Text(
                                 translate(title),
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15),
+                                style: pal.textH2,
                               ).marginOnly(bottom: 6)),
                             ]
                           : <Widget>[]) +
@@ -681,11 +676,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                         if (content.isNotEmpty)
                           Text(
                             translate(content),
-                            style: TextStyle(
-                                height: 1.5,
-                                color: Colors.white,
-                                fontWeight: FontWeight.normal,
-                                fontSize: 13),
+                            style: pal.textBody.copyWith(height: 1.5, fontSize: 13),
                           ).marginOnly(bottom: 20)
                       ] +
                       (btnText.isNotEmpty
@@ -698,8 +689,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                       padding: 8,
                                       isOutline: true,
                                       text: translate(btnText),
-                                      textColor: Colors.white,
-                                      borderColor: Colors.white,
+                                      textColor: pal.text,
+                                      borderColor: pal.cardBorder,
                                       textSize: 20,
                                       radius: 10,
                                       onTap: onPressed,
@@ -715,10 +706,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                           await launchUrl(Uri.parse(link!)),
                                       child: Text(
                                         translate(help),
-                                        style: TextStyle(
+                                        style: pal.textLink.copyWith(
                                             decoration:
                                                 TextDecoration.underline,
-                                            color: Colors.white,
                                             fontSize: 12),
                                       )).marginOnly(top: 6)),
                             ]
@@ -731,7 +721,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             child: IconButton(
               icon: Icon(
                 Icons.close,
-                color: Colors.white,
+                color: pal.muted,
                 size: 20,
               ),
               onPressed: closeCard,

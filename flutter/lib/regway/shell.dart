@@ -55,10 +55,11 @@ class RwShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       final m = RwMetrics.of(constraints);
+      final p = rwOf(context);
       return Material(
-        color: RwColors.bg,
+        color: p.bg,
         child: DefaultTextStyle(
-          style: RwText.body,
+          style: p.textBody,
           child: Stack(
             children: [
               const Positioned.fill(child: _CosmicBackdrop()),
@@ -93,8 +94,12 @@ class _CosmicBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
+    if (!p.cosmicBackdrop) {
+      return ColoredBox(color: p.bg);
+    }
     return DecoratedBox(
-      decoration: const BoxDecoration(color: RwColors.bg),
+      decoration: BoxDecoration(color: p.bg),
       child: CustomPaint(painter: _CosmicPainter()),
     );
   }
@@ -149,7 +154,7 @@ class RwSidebar extends StatelessWidget {
                 Flexible(
                   child: Text(
                     displayAppName(),
-                    style: RwText.brand.copyWith(fontSize: 14, height: 1.15),
+                    style: rwOf(context).textBrand.copyWith(fontSize: 14, height: 1.15),
                     maxLines: 2,
                     softWrap: true,
                   ),
@@ -204,6 +209,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
@@ -215,23 +221,23 @@ class _NavItem extends StatelessWidget {
             duration: const Duration(milliseconds: 120),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             decoration: BoxDecoration(
-              color: selected ? RwColors.navOnBg : Colors.transparent,
+              color: selected ? p.navOnBg : Colors.transparent,
               borderRadius: BorderRadius.circular(RwDim.radiusField),
               border: Border.all(
-                color: selected ? RwColors.navOnBorder : Colors.transparent,
+                color: selected ? p.navOnBorder : Colors.transparent,
               ),
             ),
             child: Row(
               children: [
                 Icon(icon,
                     size: 18,
-                    color: selected ? RwColors.text : RwColors.muted),
+                    color: selected ? p.text : p.muted),
                 const SizedBox(width: 12),
                 Flexible(
                   child: Text(
                     label,
-                    style: RwText.nav.copyWith(
-                      color: selected ? RwColors.text : RwColors.muted,
+                    style: p.textNav.copyWith(
+                      color: selected ? p.text : p.muted,
                     ),
                   ),
                 ),
@@ -249,6 +255,7 @@ class _ProfileTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     return Obx(() {
       final loggedIn = gFFI.userModel.isLogin;
       final name = loggedIn
@@ -270,8 +277,8 @@ class _ProfileTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.fromLTRB(10, 16, 10, 10),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: RwColors.border)),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: p.cardBorder)),
           ),
           child: Row(
             children: [
@@ -284,11 +291,11 @@ class _ProfileTile extends StatelessWidget {
                     Text(name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: RwText.bodyStrong.copyWith(fontSize: 13)),
+                        style: p.textBodyStrong.copyWith(fontSize: 13)),
                     Text(subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: RwText.muted.copyWith(fontSize: 12)),
+                        style: p.textMuted.copyWith(fontSize: 12)),
                   ],
                 ),
               ),

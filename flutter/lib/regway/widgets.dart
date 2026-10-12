@@ -3,34 +3,55 @@ import 'package:flutter/services.dart';
 
 import 'theme.dart';
 
-class RwPanel extends StatelessWidget {
+class RwPanel extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final double? width;
   final bool expand;
+  final bool hoverable;
   const RwPanel({
     super.key,
     required this.child,
     this.padding,
     this.width,
     this.expand = false,
+    this.hoverable = false,
   });
 
   @override
+  State<RwPanel> createState() => _RwPanelState();
+}
+
+class _RwPanelState extends State<RwPanel> {
+  bool hover = false;
+  bool focus = false;
+
+  @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     final body = Material(
       color: Colors.transparent,
-      child: Container(
-        width: width,
-        padding: padding ?? const EdgeInsets.all(18),
-        decoration: RwDecor.panel,
-        child: DefaultTextStyle(
-          style: RwText.body,
-          child: child,
+      child: MouseRegion(
+        onEnter: widget.hoverable ? (_) => setState(() => hover = true) : null,
+        onExit: widget.hoverable ? (_) => setState(() => hover = false) : null,
+        child: Focus(
+          canRequestFocus: false,
+          onFocusChange: widget.hoverable
+              ? (v) => setState(() => focus = v)
+              : null,
+          child: Container(
+            width: widget.width,
+            padding: widget.padding ?? const EdgeInsets.all(18),
+            decoration: RwDecor.panelOf(p, hover: hover, focus: focus),
+            child: DefaultTextStyle(
+              style: p.textBody,
+              child: widget.child,
+            ),
+          ),
         ),
       ),
     );
-    if (expand) {
+    if (widget.expand) {
       return SizedBox.expand(child: body);
     }
     return body;
@@ -61,20 +82,21 @@ class _RwButtonState extends State<RwButton> {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     final enabled = widget.onPressed != null;
     final Color bg;
     final Color fg;
     if (widget.danger) {
-      bg = hover && enabled ? const Color(0xFFFF5A75) : RwColors.danger;
-      fg = RwColors.white;
+      bg = hover && enabled ? p.dangerHover : p.danger;
+      fg = p.white;
     } else if (widget.ghost) {
-      bg = RwColors.ghostFill;
-      fg = enabled ? RwColors.text : RwColors.muted.withOpacity(0.6);
+      bg = p.ghostFill;
+      fg = enabled ? p.text : p.muted.withOpacity(0.6);
     } else {
       bg = !enabled
-          ? RwColors.accent.withOpacity(0.35)
-          : (hover ? RwColors.accentHover : RwColors.accent);
-      fg = RwColors.onAccent;
+          ? p.accent.withOpacity(0.35)
+          : (hover ? p.accentHover : p.accent);
+      fg = p.onAccent;
     }
     return MouseRegion(
       onEnter: (_) => setState(() => hover = true),
@@ -91,14 +113,12 @@ class _RwButtonState extends State<RwButton> {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(RwDim.radiusField),
-            border: widget.ghost
-                ? Border.all(color: RwColors.border)
-                : null,
+            border: widget.ghost ? Border.all(color: p.cardBorder) : null,
           ),
           child: Text(
             widget.label,
             textAlign: TextAlign.center,
-            style: RwText.btn.copyWith(
+            style: p.textBtn.copyWith(
               color: fg,
               fontWeight: widget.ghost ? FontWeight.w600 : FontWeight.w700,
             ),
@@ -116,6 +136,7 @@ class RwSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     return GestureDetector(
       onTap: onChanged == null ? null : () => onChanged!(!value),
       child: AnimatedContainer(
@@ -123,7 +144,7 @@ class RwSwitch extends StatelessWidget {
         width: RwDim.switchW,
         height: RwDim.switchH,
         decoration: BoxDecoration(
-          color: value ? RwColors.accent : RwColors.toggleOff,
+          color: value ? p.accent : p.toggleOff,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Align(
@@ -132,8 +153,8 @@ class RwSwitch extends StatelessWidget {
             margin: const EdgeInsets.all(3),
             width: RwDim.switchThumb,
             height: RwDim.switchThumb,
-            decoration: const BoxDecoration(
-              color: RwColors.white,
+            decoration: BoxDecoration(
+              color: p.white,
               shape: BoxShape.circle,
             ),
           ),
@@ -150,6 +171,7 @@ class RwAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     final ch = letter.trim().isEmpty
         ? '?'
         : letter.trim().substring(0, 1).toUpperCase();
@@ -167,7 +189,7 @@ class RwAvatar extends StatelessWidget {
           fontFamily: RwFonts.head,
           fontWeight: FontWeight.w600,
           fontSize: size * 0.42,
-          color: RwColors.onAccent,
+          color: p.onAccent,
         ),
       ),
     );
@@ -181,7 +203,8 @@ class RwStatusDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = online ? RwColors.accent : RwColors.muted;
+    final p = rwOf(context);
+    final color = online ? p.accent : p.muted;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -194,7 +217,7 @@ class RwStatusDot extends StatelessWidget {
             boxShadow: online
                 ? [
                     BoxShadow(
-                      color: RwColors.accent.withOpacity(0.9),
+                      color: p.accent.withOpacity(0.9),
                       blurRadius: 8,
                     )
                   ]
@@ -205,7 +228,7 @@ class RwStatusDot extends StatelessWidget {
           const SizedBox(width: 7),
           Text(
             label!,
-            style: RwText.bodyStrong.copyWith(
+            style: p.textBodyStrong.copyWith(
               fontSize: 13,
               color: color,
             ),
@@ -231,6 +254,7 @@ class _RwIconHitState extends State<RwIconHit> {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     final child = MouseRegion(
       onEnter: (_) => setState(() => hover = true),
       onExit: (_) => setState(() => hover = false),
@@ -242,10 +266,10 @@ class _RwIconHitState extends State<RwIconHit> {
           height: 30,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: RwColors.border),
-            color: hover ? RwColors.ghostFill : Colors.transparent,
+            border: Border.all(color: p.cardBorder),
+            color: hover ? p.ghostFill : Colors.transparent,
           ),
-          child: Icon(widget.icon, size: 15, color: RwColors.muted),
+          child: Icon(widget.icon, size: 15, color: p.muted),
         ),
       ),
     );
@@ -285,12 +309,13 @@ class RwTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          decoration: RwDecor.input,
+          decoration: RwDecor.inputOf(p),
           child: Row(
             children: [
               Expanded(
@@ -303,13 +328,13 @@ class RwTextField extends StatelessWidget {
                   inputFormatters: inputFormatters,
                   onChanged: onChanged,
                   onSubmitted: onSubmitted,
-                  style: (big ? RwText.num : RwText.body).copyWith(
+                  style: (big ? p.textNum : p.textBody).copyWith(
                     fontFeatures: kRwTabularFigures,
                     fontSize: big ? 22 : 13,
                     fontWeight: big ? FontWeight.w700 : FontWeight.w400,
-                    color: RwColors.text,
+                    color: p.text,
                   ),
-                  cursorColor: RwColors.accent,
+                  cursorColor: p.accent,
                   decoration: InputDecoration(
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
@@ -318,7 +343,7 @@ class RwTextField extends StatelessWidget {
                     isDense: true,
                     // Hint only when there is no external label with the same text.
                     hintText: hint,
-                    hintStyle: RwText.muted.copyWith(fontSize: 13),
+                    hintStyle: p.textMuted.copyWith(fontSize: 13),
                     labelText: null,
                     floatingLabelBehavior: FloatingLabelBehavior.never,
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -332,7 +357,7 @@ class RwTextField extends StatelessWidget {
         if (errorText != null && errorText!.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 4),
-            child: Text(errorText!, style: RwText.error),
+            child: Text(errorText!, style: p.textError),
           ),
       ],
     );
@@ -352,13 +377,14 @@ class RwLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap,
         child: Text(
           label,
-          style: RwText.link.copyWith(fontSize: fontSize),
+          style: p.textLink.copyWith(fontSize: fontSize),
         ),
       ),
     );

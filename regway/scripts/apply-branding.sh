@@ -12,6 +12,8 @@ set -euo pipefail
 export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=hbbs-key.sh
+source "$HERE/scripts/hbbs-key.sh"
 RD="$(cd "${1:-$HERE/rustdesk}" && pwd)"
 DESIGN="$(cd "${2:-$HERE/branding/design}" && pwd)"
 
@@ -42,6 +44,20 @@ if [ "${REQUIRE_REAL_KEY:-0}" = 1 ]; then
   [ "$ID_SERVER" = "$H" ]             || { echo "ОШИБКА: ID_SERVER='$ID_SERVER', ожидается ровно '$H'" >&2; exit 1; }
   [ "$RELAY_SERVER" = "$H:21117" ]    || { echo "ОШИБКА: RELAY_SERVER='$RELAY_SERVER', ожидается ровно '$H:21117'" >&2; exit 1; }
   [ "$API_SERVER" = "https://$H" ]    || { echo "ОШИБКА: API_SERVER='$API_SERVER', ожидается ровно 'https://$H'" >&2; exit 1; }
+fi
+
+# Public hbbs key check. Never print the full key: sha256 + first/last 4 chars.
+echo "hbbs KEY fingerprint: $(hbbs_key_fingerprint "$KEY")"
+echo "hbbs expected fingerprint: $(hbbs_key_fingerprint "$EXPECTED_HBBS_PUB_KEY")"
+if [ "${REQUIRE_REAL_KEY:-0}" = 1 ]; then
+  if [ "$KEY" != "$EXPECTED_HBBS_PUB_KEY" ]; then
+    echo "ОШИБКА: RS_PUB_KEY не совпадает с ожидаемым публичным ключом hbbs." >&2
+    echo "  secret:   $(hbbs_key_fingerprint "$KEY")" >&2
+    echo "  expected: $(hbbs_key_fingerprint "$EXPECTED_HBBS_PUB_KEY")" >&2
+    echo "Секрет в GitHub Actions нельзя поменять из этого агента; обновите RS_PUB_KEY вручную." >&2
+    exit 1
+  fi
+  echo "OK   RS_PUB_KEY matches expected hbbs public key"
 fi
 
 export RD APP_NAME APP_DISPLAY_NAME ORG BUNDLE_ID COMPANY ID_SERVER ID_HOST RELAY_SERVER API_SERVER KEY WEBSITE_URL DOMAIN

@@ -168,31 +168,31 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
   final Color? divider;
 
   static final light = ColorThemeExtension(
-    border: Color(0xFFCCCCCC),
-    border2: Color(0xFFBBBBBB),
-    border3: Colors.black26,
-    highlight: Color(0xFFE5E5E5),
-    drag_indicator: Colors.grey[800],
-    shadow: Colors.black,
-    errorBannerBg: Color(0xFFFDEEEB),
-    me: Colors.green,
+    border: RwPalette.light.cardBorder,
+    border2: RwPalette.light.muted,
+    border3: RwPalette.light.cardBorder,
+    highlight: const Color(0xFFE8EAF4),
+    drag_indicator: RwPalette.light.muted,
+    shadow: const Color(0x140A0820),
+    errorBannerBg: const Color(0xFFFDEEEB),
+    me: RwPalette.light.accent,
     toastBg: Colors.black.withOpacity(0.6),
     toastText: Colors.white,
-    divider: Colors.black38,
+    divider: RwPalette.light.cardBorder,
   );
 
   static final dark = ColorThemeExtension(
-    border: RwColors.border,
-    border2: RwColors.muted,
-    border3: RwColors.border,
-    highlight: const Color(0xFF16142C),
-    drag_indicator: RwColors.muted,
+    border: RwPalette.dark.cardBorder,
+    border2: RwPalette.dark.muted,
+    border3: RwPalette.dark.cardBorder,
+    highlight: RwPalette.dark.cardHover,
+    drag_indicator: RwPalette.dark.muted,
     shadow: Colors.black,
     errorBannerBg: const Color(0xFF3A1020),
-    me: RwColors.accent,
+    me: RwPalette.dark.accent,
     toastBg: Colors.black.withOpacity(0.6),
-    toastText: RwColors.text,
-    divider: RwColors.border,
+    toastText: RwPalette.dark.text,
+    divider: RwPalette.dark.cardBorder,
   );
 
   @override
@@ -273,8 +273,8 @@ class MyTheme {
     ),
   );
 
-  static SwitchThemeData switchTheme() {
-    return rwSwitchTheme().copyWith(
+  static SwitchThemeData switchTheme([RwPalette p = RwPalette.dark]) {
+    return rwSwitchTheme(p).copyWith(
         splashRadius: (isDesktop || isWebDesktop) ? 0 : kRadialReactionRadius);
   }
 
@@ -376,45 +376,61 @@ class MyTheme {
     // https://stackoverflow.com/questions/77537315/after-upgrading-to-flutter-3-16-the-app-bar-background-color-button-size-and
     useMaterial3: false,
     brightness: Brightness.light,
-    hoverColor: Color.fromARGB(255, 224, 224, 224),
-    scaffoldBackgroundColor: Colors.white,
-    dialogBackgroundColor: Colors.white,
-    appBarTheme: AppBarTheme(
+    fontFamily: RwFonts.body,
+    hoverColor: const Color(0xFFE8EAF4),
+    scaffoldBackgroundColor: RwPalette.light.bg,
+    dialogBackgroundColor: RwPalette.light.card,
+    canvasColor: RwPalette.light.bg,
+    appBarTheme: const AppBarTheme(
       shadowColor: Colors.transparent,
+      backgroundColor: Color(0xFFF4F5FB),
+      foregroundColor: Color(0xFF14122B),
     ),
     dialogTheme: DialogTheme(
-      elevation: 15,
+      elevation: 8,
+      backgroundColor: RwPalette.light.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18.0),
-        side: BorderSide(
+        borderRadius: BorderRadius.circular(RwDim.radiusPanel),
+        side: const BorderSide(
           width: 1,
-          color: grayBg,
+          color: Color(0xFFDFE1EE),
         ),
       ),
     ),
     scrollbarTheme: scrollbarTheme,
-    inputDecorationTheme: isDesktop
-        ? InputDecorationTheme(
-            fillColor: grayBg,
-            filled: true,
-            isDense: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          )
-        : null,
+    inputDecorationTheme:
+        (isDesktop || isWebDesktop) ? rwInputDecorationTheme(RwPalette.light) : null,
     textTheme: const TextTheme(
-        titleLarge: TextStyle(fontSize: 19, color: Colors.black87),
-        titleSmall: TextStyle(fontSize: 14, color: Colors.black87),
-        bodySmall: TextStyle(fontSize: 12, color: Colors.black87, height: 1.25),
-        bodyMedium:
-            TextStyle(fontSize: 14, color: Colors.black87, height: 1.25),
-        labelLarge: TextStyle(fontSize: 16.0, color: MyTheme.accent80)),
-    cardColor: grayBg,
-    hintColor: Color(0xFFAAAAAA),
+      titleLarge: TextStyle(
+          fontFamily: RwFonts.head,
+          fontWeight: FontWeight.w600,
+          fontSize: 19,
+          color: Color(0xFF14122B)),
+      titleSmall: TextStyle(
+          fontFamily: RwFonts.body, fontSize: 14, color: Color(0xFF14122B)),
+      bodySmall: TextStyle(
+          fontFamily: RwFonts.body,
+          fontSize: 12,
+          height: 1.25,
+          color: Color(0xFF5D6180)),
+      bodyMedium: TextStyle(
+          fontFamily: RwFonts.body,
+          fontSize: 14,
+          height: 1.25,
+          color: Color(0xFF14122B)),
+      labelLarge: TextStyle(
+        fontFamily: RwFonts.body,
+        fontSize: 16.0,
+        fontWeight: FontWeight.bold,
+        color: Color(0xFF0A9CC2),
+      ),
+    ),
+    cardColor: RwPalette.light.card,
+    hintColor: RwPalette.light.muted,
     visualDensity: VisualDensity.adaptivePlatformDensity,
     tabBarTheme: const TabBarTheme(
-      labelColor: Colors.black87,
+      labelColor: Color(0xFF14122B),
+      unselectedLabelColor: Color(0xFF5D6180),
     ),
     tooltipTheme: tooltipTheme(),
     splashColor: (isDesktop || isWebDesktop) ? Colors.transparent : null,
@@ -424,55 +440,59 @@ class MyTheme {
         ? TextButtonThemeData(
             style: TextButton.styleFrom(
               splashFactory: NoSplash.splashFactory,
+              disabledForegroundColor: const Color(0xFF5D6180),
+              foregroundColor: const Color(0xFF0A9CC2),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18.0),
+                borderRadius: BorderRadius.circular(RwDim.radiusField),
               ),
             ),
           )
         : mobileTextButtonTheme,
     elevatedButtonTheme: ElevatedButtonThemeData(
-      style: rwFilledButtonStyle(),
+      style: rwFilledButtonStyle(RwPalette.light),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        backgroundColor: grayBg,
-        foregroundColor: Colors.black87,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-      ),
+      style: rwGhostButtonStyle(RwPalette.light),
     ),
-    switchTheme: switchTheme(),
+    switchTheme: switchTheme(RwPalette.light),
     radioTheme: radioTheme(),
     checkboxTheme: checkboxTheme,
     listTileTheme: listTileTheme,
     menuBarTheme: MenuBarThemeData(
-        style:
-            MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
-    colorScheme: ColorScheme.light(
-        primary: Colors.blue, secondary: accent, background: grayBg),
+        style: MenuStyle(
+            backgroundColor:
+                MaterialStatePropertyAll(RwPalette.light.card))),
+    colorScheme: const ColorScheme.light(
+      primary: Color(0xFF0A9CC2),
+      secondary: Color(0xFF7C5CFF),
+      background: Color(0xFFF4F5FB),
+      surface: Color(0xFFFFFFFF),
+      error: Color(0xFFD41E48),
+      onPrimary: Color(0xFFFFFFFF),
+    ),
     popupMenuTheme: PopupMenuThemeData(
-        color: Colors.white,
+        color: RwPalette.light.card,
         shape: RoundedRectangleBorder(
           side: BorderSide(
               color: (isDesktop || isWebDesktop)
-                  ? Color(0xFFECECEC)
+                  ? RwPalette.light.cardBorder
                   : Colors.transparent),
-          borderRadius: BorderRadius.all(Radius.circular(8.0)),
+          borderRadius: BorderRadius.all(Radius.circular(RwDim.radiusField)),
         )),
   ).copyWith(
     extensions: <ThemeExtension<dynamic>>[
       ColorThemeExtension.light,
       TabbarTheme.light,
+      RwPalette.light,
     ],
   );
   static ThemeData darkTheme = ThemeData(
     useMaterial3: false,
     brightness: Brightness.dark,
     fontFamily: RwFonts.body,
-    hoverColor: const Color(0xFF16142C),
+    hoverColor: RwPalette.dark.cardHover,
     scaffoldBackgroundColor: RwColors.bg,
-    dialogBackgroundColor: RwColors.bg2,
+    dialogBackgroundColor: RwPalette.dark.card,
     canvasColor: RwColors.bg,
     appBarTheme: const AppBarTheme(
       shadowColor: Colors.transparent,
@@ -481,7 +501,7 @@ class MyTheme {
     ),
     dialogTheme: DialogTheme(
       elevation: 15,
-      backgroundColor: RwColors.bg2,
+      backgroundColor: RwPalette.dark.card,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(RwDim.radiusPanel),
         side: const BorderSide(
@@ -518,7 +538,7 @@ class MyTheme {
         color: accent80,
       ),
     ),
-    cardColor: RwColors.bg2,
+    cardColor: RwPalette.dark.card,
     visualDensity: VisualDensity.adaptivePlatformDensity,
     tabBarTheme: const TabBarTheme(
       labelColor: RwColors.text,
@@ -552,16 +572,16 @@ class MyTheme {
     listTileTheme: listTileTheme,
     menuBarTheme: MenuBarThemeData(
         style: MenuStyle(
-            backgroundColor: MaterialStatePropertyAll(RwColors.bg2))),
+            backgroundColor: MaterialStatePropertyAll(RwPalette.dark.card))),
     colorScheme: const ColorScheme.dark(
       primary: RwColors.accent,
       secondary: RwColors.violet,
-      background: RwColors.bg2,
-      surface: RwColors.bg2,
+      background: RwColors.bg,
+      surface: Color(0xFF15123A),
       error: RwColors.danger,
     ),
     popupMenuTheme: PopupMenuThemeData(
-        color: RwColors.bg2,
+        color: RwPalette.dark.card,
         shape: RoundedRectangleBorder(
       side: const BorderSide(color: RwColors.border),
       borderRadius: BorderRadius.all(Radius.circular(RwDim.radiusField)),
@@ -570,6 +590,7 @@ class MyTheme {
     extensions: <ThemeExtension<dynamic>>[
       ColorThemeExtension.dark,
       TabbarTheme.dark,
+      RwPalette.dark,
     ],
   );
 

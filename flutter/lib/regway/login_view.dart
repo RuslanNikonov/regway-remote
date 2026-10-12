@@ -23,10 +23,11 @@ class RwLoginPage extends StatelessWidget {
     // Stack overlay in DesktopTabPage is not under the home Scaffold.
     // Scaffold + DefaultTextStyle give Text / TextField / Checkbox a Material
     // ancestor (no yellow double underline).
+    final p = rwOf(context);
     return Scaffold(
-      backgroundColor: RwColors.bg,
+      backgroundColor: p.bg,
       body: DefaultTextStyle(
-        style: RwText.body,
+        style: p.textBody,
         child: const Stack(
           children: [
             Positioned.fill(child: _LoginBackdrop()),
@@ -48,6 +49,10 @@ class _LoginBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
+    if (!p.cosmicBackdrop) {
+      return ColoredBox(color: p.bg);
+    }
     return CustomPaint(painter: _LoginPainter());
   }
 }
@@ -207,7 +212,9 @@ class _RwLoginCardState extends State<RwLoginCard> {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     return RwPanel(
+      hoverable: true,
       width: 420,
       padding: const EdgeInsets.fromLTRB(36, 36, 36, 28),
       child: Column(
@@ -223,12 +230,12 @@ class _RwLoginCardState extends State<RwLoginCard> {
           const SizedBox(height: 12),
           Text('RegWay Remote',
               textAlign: TextAlign.center,
-              style: RwText.h1.copyWith(fontSize: 22)),
+              style: p.textH1.copyWith(fontSize: 22)),
           const SizedBox(height: 6),
           Text(translate('Sign in to see your computers'),
-              textAlign: TextAlign.center, style: RwText.muted),
+              textAlign: TextAlign.center, style: p.textMuted),
           const SizedBox(height: 22),
-          Text(translate('Email or login'), style: RwText.label),
+          Text(translate('Email or login'), style: p.textLabel),
           const SizedBox(height: 6),
           RwTextField(
             controller: username,
@@ -237,7 +244,7 @@ class _RwLoginCardState extends State<RwLoginCard> {
             onSubmitted: (_) => _onLogin(),
           ),
           const SizedBox(height: 12),
-          Text(translate('Password'), style: RwText.label),
+          Text(translate('Password'), style: p.textLabel),
           const SizedBox(height: 6),
           RwTextField(
             controller: password,
@@ -262,9 +269,9 @@ class _RwLoginCardState extends State<RwLoginCard> {
                         height: 18,
                         child: Checkbox(
                           value: remember,
-                          activeColor: RwColors.accent,
-                          checkColor: RwColors.onAccent,
-                          side: const BorderSide(color: RwColors.muted),
+                          activeColor: p.accent,
+                          checkColor: p.onAccent,
+                          side: BorderSide(color: p.muted),
                           onChanged: (v) =>
                               setState(() => remember = v ?? true),
                         ),
@@ -272,7 +279,7 @@ class _RwLoginCardState extends State<RwLoginCard> {
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(translate('Remember me'),
-                            style: RwText.muted.copyWith(fontSize: 12.5)),
+                            style: p.textMuted.copyWith(fontSize: 12.5)),
                       ),
                     ],
                   ),
@@ -293,11 +300,11 @@ class _RwLoginCardState extends State<RwLoginCard> {
           ),
           const SizedBox(height: 16),
           if (inProgress)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 10),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
               child: LinearProgressIndicator(
-                color: RwColors.accent,
-                backgroundColor: RwColors.toggleOff,
+                color: p.accent,
+                backgroundColor: p.toggleOff,
               ),
             ),
           Obx(() => RwButton(
@@ -312,7 +319,7 @@ class _RwLoginCardState extends State<RwLoginCard> {
               children: [
                 const SizedBox(height: 12),
                 Text(translate('or'),
-                    style: RwText.muted, textAlign: TextAlign.center),
+                    style: p.textMuted, textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 LoginWidgetOP(
                   ops: loginOptions

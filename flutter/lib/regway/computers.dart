@@ -42,9 +42,15 @@ String rwPlatformLabel(String platform) {
   }
 }
 
-LinearGradient rwWallpaper(Peer peer) {
-  if (!peer.online) return RwDecor.wallpaperOffline;
-  return peer.id.hashCode.isEven ? RwDecor.wallpaper1 : RwDecor.wallpaper2;
+LinearGradient rwWallpaper(Peer peer, [RwPalette? p]) {
+  final light = p != null && !p.cosmicBackdrop;
+  if (!peer.online) {
+    return light ? RwDecor.wallpaperOfflineLight : RwDecor.wallpaperOffline;
+  }
+  if (peer.id.hashCode.isEven) {
+    return light ? RwDecor.wallpaper1Light : RwDecor.wallpaper1;
+  }
+  return light ? RwDecor.wallpaper2Light : RwDecor.wallpaper2;
 }
 
 class RwComputersPage extends StatefulWidget {
@@ -131,12 +137,13 @@ class _RwComputersPageState extends State<RwComputersPage> {
         connect(context, id);
       }
 
+      final pal = rwOf(ctx);
       return CustomAlertDialog(
-        title: Text(translate('Add'), style: RwText.h2),
+        title: Text(translate('Add'), style: pal.textH2),
         content: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(translate('Computer ID'), style: RwText.label),
+            Text(translate('Computer ID'), style: pal.textLabel),
             const SizedBox(height: 8),
             RwTextField(
               controller: idCtrl,
@@ -158,6 +165,7 @@ class _RwComputersPageState extends State<RwComputersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     final peers = _filtered();
     final recent = gFFI.recentPeersModel.peers;
     return Column(
@@ -171,9 +179,9 @@ class _RwComputersPageState extends State<RwComputersPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(translate('Computers'), style: RwText.h1),
+                  Text(translate('Computers'), style: p.textH1),
                   const SizedBox(height: 6),
-                  Text(translate('Devices of your account'), style: RwText.muted),
+                  Text(translate('Devices of your account'), style: p.textMuted),
                 ],
               ),
             ),
@@ -196,7 +204,7 @@ class _RwComputersPageState extends State<RwComputersPage> {
               child: Center(
                 child: Text(
                   translate('No computers yet'),
-                  style: RwText.muted,
+                  style: p.textMuted,
                 ),
               ),
             ),
@@ -235,8 +243,10 @@ class RwPeerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     final online = peer.online;
     return RwPanel(
+      hoverable: true,
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -246,21 +256,21 @@ class RwPeerCard extends StatelessWidget {
               height: 110,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: RwColors.border),
-                gradient: rwWallpaper(peer),
+                border: Border.all(color: p.cardBorder),
+                gradient: rwWallpaper(peer, p),
               ),
               alignment: Alignment.center,
               child: online
                   ? null
                   : Icon(Icons.grid_view_rounded,
-                      size: 34, color: RwColors.text.withOpacity(0.8)),
+                      size: 34, color: p.text.withOpacity(0.8)),
             ),
           ),
           const SizedBox(height: 9),
           Text(rwPeerTitle(peer),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: RwText.h3),
+              style: p.textH3),
           const SizedBox(height: 6),
           RwStatusDot(
             online: online,
@@ -271,10 +281,10 @@ class RwPeerCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(rwPlatformLabel(peer.platform),
-                    style: RwText.muted.copyWith(fontSize: 12.5)),
+                    style: p.textMuted.copyWith(fontSize: 12.5)),
               ),
               Text(formatID(peer.id),
-                  style: RwText.numSm.copyWith(color: RwColors.muted)),
+                  style: p.textNumSm.copyWith(color: p.muted)),
             ],
           ),
           const SizedBox(height: 9),
@@ -296,6 +306,7 @@ class RwRecentTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     return RwPanel(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -303,7 +314,7 @@ class RwRecentTable extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(translate('Recent connections'), style: RwText.h2),
+                child: Text(translate('Recent connections'), style: p.textH2),
               ),
               RwLink(
                 label: '${translate('All connections')} →',
@@ -312,12 +323,12 @@ class RwRecentTable extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _header(),
+          _header(context),
           Expanded(
             child: peers.isEmpty
                 ? Center(
                     child: Text(translate('No recent connections'),
-                        style: RwText.muted))
+                        style: p.textMuted))
                 : ListView.builder(
                     itemCount: peers.length,
                     itemBuilder: (_, i) => _row(context, peers[i]),
@@ -328,12 +339,13 @@ class RwRecentTable extends StatelessWidget {
     );
   }
 
-  Widget _header() {
-    TextStyle st = RwText.label.copyWith(fontSize: 12);
+  Widget _header(BuildContext context) {
+    final p = rwOf(context);
+    TextStyle st = p.textLabel.copyWith(fontSize: 12);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: RwColors.border)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: p.cardBorder)),
       ),
       child: Row(
         children: [
@@ -347,12 +359,13 @@ class RwRecentTable extends StatelessWidget {
   }
 
   Widget _row(BuildContext context, Peer peer) {
+    final p = rwOf(context);
     return InkWell(
       onTap: peer.online ? () => connect(context, peer.id) : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: RwColors.border)),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: p.cardBorder)),
         ),
         child: Row(
           children: [
@@ -365,8 +378,8 @@ class RwRecentTable extends StatelessWidget {
                     height: 26,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(6),
-                      gradient: rwWallpaper(peer),
-                      border: Border.all(color: RwColors.border),
+                      gradient: rwWallpaper(peer, p),
+                      border: Border.all(color: p.cardBorder),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -377,9 +390,9 @@ class RwRecentTable extends StatelessWidget {
                         Text(rwPeerTitle(peer),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: RwText.bodyStrong.copyWith(fontSize: 13)),
+                            style: p.textBodyStrong.copyWith(fontSize: 13)),
                         Text(rwPlatformLabel(peer.platform),
-                            style: RwText.muted.copyWith(fontSize: 11.5)),
+                            style: p.textMuted.copyWith(fontSize: 11.5)),
                       ],
                     ),
                   ),
@@ -388,15 +401,15 @@ class RwRecentTable extends StatelessWidget {
             ),
             Expanded(
               flex: 2,
-              child: Text(formatID(peer.id), style: RwText.numSm),
+              child: Text(formatID(peer.id), style: p.textNumSm),
             ),
             Expanded(
               flex: 3,
-              child: Text('—', style: RwText.numSm.copyWith(color: RwColors.muted)),
+              child: Text('—', style: p.textNumSm.copyWith(color: p.muted)),
             ),
             Expanded(
               flex: 2,
-              child: Text('—', style: RwText.numSm.copyWith(color: RwColors.muted)),
+              child: Text('—', style: p.textNumSm.copyWith(color: p.muted)),
             ),
           ],
         ),
@@ -410,12 +423,13 @@ class RwHistoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(translate('History'), style: RwText.h1),
+        Text(translate('History'), style: p.textH1),
         const SizedBox(height: 6),
-        Text(translate('Recent connections'), style: RwText.muted),
+        Text(translate('Recent connections'), style: p.textMuted),
         const SizedBox(height: 18),
         Expanded(
           child: RwRecentTable(
@@ -433,12 +447,13 @@ class RwConnectionsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(translate('Connections'), style: RwText.h1),
+        Text(translate('Connections'), style: p.textH1),
         const SizedBox(height: 6),
-        Text(translate('Devices of your account'), style: RwText.muted),
+        Text(translate('Devices of your account'), style: p.textMuted),
         const SizedBox(height: 18),
         const Expanded(child: PeerTabPage()),
       ],
@@ -473,13 +488,14 @@ class _RwQuickConnectState extends State<RwQuickConnect> {
 
   @override
   Widget build(BuildContext context) {
+    final p = rwOf(context);
     return RwPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(translate('Quick connect'), style: RwText.h2),
+          Text(translate('Quick connect'), style: p.textH2),
           const SizedBox(height: 14),
-          Text(translate('Computer ID'), style: RwText.label),
+          Text(translate('Computer ID'), style: p.textLabel),
           const SizedBox(height: 6),
           RwTextField(
             controller: _id,
@@ -487,7 +503,7 @@ class _RwQuickConnectState extends State<RwQuickConnect> {
             onSubmitted: (_) => _go(),
           ),
           const SizedBox(height: 10),
-          Text(translate('Password'), style: RwText.label),
+          Text(translate('Password'), style: p.textLabel),
           const SizedBox(height: 6),
           RwTextField(
             controller: _pass,
@@ -561,13 +577,14 @@ class _RwThisComputerState extends State<RwThisComputer> {
             } else {
               statusText = translate('connecting_status');
             }
+            final p = rwOf(context);
             return RwPanel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(translate('This computer'), style: RwText.h2),
+                  Text(translate('This computer'), style: p.textH2),
                   const SizedBox(height: 14),
-                  Text(translate('Your ID'), style: RwText.label),
+                  Text(translate('Your ID'), style: p.textLabel),
                   const SizedBox(height: 6),
                   RwTextField(
                     controller: model.serverId,
@@ -584,7 +601,7 @@ class _RwThisComputerState extends State<RwThisComputer> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Text(translate('Password'), style: RwText.label),
+                  Text(translate('Password'), style: p.textLabel),
                   const SizedBox(height: 6),
                   RwTextField(
                     controller: model.serverPasswd,
@@ -620,7 +637,7 @@ class _RwThisComputerState extends State<RwThisComputer> {
                     children: [
                       Expanded(
                         child: Text(translate('Allow incoming'),
-                            style: RwText.bodyStrong.copyWith(fontSize: 13)),
+                            style: p.textBodyStrong.copyWith(fontSize: 13)),
                       ),
                       RwSwitch(
                         value: !stopped,
@@ -636,7 +653,7 @@ class _RwThisComputerState extends State<RwThisComputer> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: RwColors.border),
+                      border: Border.all(color: p.cardBorder),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -652,7 +669,7 @@ class _RwThisComputerState extends State<RwThisComputer> {
                             Expanded(
                               child: Text(
                                 '${translate('Server')}: $statusText',
-                                style: RwText.bodyStrong.copyWith(fontSize: 13),
+                                style: p.textBodyStrong.copyWith(fontSize: 13),
                                 maxLines: 3,
                                 softWrap: true,
                               ),
@@ -663,7 +680,7 @@ class _RwThisComputerState extends State<RwThisComputer> {
                           const SizedBox(height: 6),
                           Text(translate('Encryption on'),
                               textAlign: TextAlign.end,
-                              style: RwText.muted.copyWith(
+                              style: p.textMuted.copyWith(
                                   fontSize: 12, fontWeight: FontWeight.w500)),
                         ],
                       ],

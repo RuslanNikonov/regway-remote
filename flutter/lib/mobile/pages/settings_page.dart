@@ -1157,11 +1157,11 @@ void showThemeSettings(OverlayDialogManager dialogManager) async {
     final isOptFixed = isOptionFixed(kCommConfKeyTheme);
     return CustomAlertDialog(
       content: Column(children: [
-        getRadio(Text(translate('Light')), ThemeMode.light, themeMode,
+        getRadio(Text(translate('Follow System')), ThemeMode.system, themeMode,
             isOptFixed ? null : setTheme),
         getRadio(Text(translate('Dark')), ThemeMode.dark, themeMode,
             isOptFixed ? null : setTheme),
-        getRadio(Text(translate('Follow System')), ThemeMode.system, themeMode,
+        getRadio(Text(translate('Light')), ThemeMode.light, themeMode,
             isOptFixed ? null : setTheme)
       ]),
     );

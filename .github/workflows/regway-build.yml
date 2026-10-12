@@ -182,6 +182,10 @@ jobs:
           mv -Force .\usbmmidd_v2 ./rustdesk
           # Инсталлятор RustDesk ставит <APP_NAME>.exe; MSI (preprocess.py --app-name) ждёт это имя в dist.
           mv ./rustdesk/rustdesk.exe "./rustdesk/${{ env.APP_NAME }}.exe"
+      - name: Assert hbbs public key is in the Windows binary
+        shell: bash
+        working-directory: rustdesk
+        run: bash ./regway/scripts/check-key-in-binary.sh "./rustdesk/${APP_NAME}.exe"
       - name: Copy Runner.res for portable packer
         continue-on-error: true
         shell: bash
@@ -350,6 +354,9 @@ jobs:
           export FLUTTER_XCODE_ENABLE_HARDENED_RUNTIME=NO
           ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
           test -d "flutter/build/macos/Build/Products/Release/${APP_NAME}.app"
+      - name: Assert hbbs public key is in the macOS app
+        working-directory: rustdesk
+        run: bash ./regway/scripts/check-key-in-binary.sh "./flutter/build/macos/Build/Products/Release/${APP_NAME}.app"
 
       - name: "[optional] Codesign app (hardened runtime)"
         if: env.MACOS_P12_BASE64 != '' && env.MACOS_CODESIGN_IDENTITY != ''

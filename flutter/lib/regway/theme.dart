@@ -2,13 +2,17 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-/// Design tokens from `tokens.md` / `client-base.css`.
+/// Design tokens from `tokens.md` v1 (dark) and v2 (light + card contrast).
+/// Prefer [RwPalette.of] so light/dark follow ThemeMode. [RwColors] stays the
+/// dark fallback for call sites without a [BuildContext].
 class RwColors {
   RwColors._();
 
   static const Color bg = Color(0xFF04030B);
   static const Color bg2 = Color(0xFF0A0820);
-  static const Color bg2Fill = Color(0xB80A0820); // 0.72
+  static const Color bg2Fill = Color(0xFF15123A);
+  static const Color card = Color(0xFF15123A);
+  static const Color cardHover = Color(0xFF1C1848);
   static const Color inputFill = Color(0x9904030B); // 0.6
   static const Color text = Color(0xFFEEF0FF);
   static const Color muted = Color(0xFFA7ABC9);
@@ -17,15 +21,222 @@ class RwColors {
   static const Color onAccent = Color(0xFF04030B);
   static const Color violet = Color(0xFF7C5CFF);
   static const Color danger = Color(0xFFFF3D5E);
+  static const Color dangerHover = Color(0xFFFF5A75);
   static const Color warn = Color(0xFFFF7A2F);
   static const Color yellow = Color(0xFFFFC069);
-  static const Color border = Color(0x1EA7ABC9); // 0.12
+  static const Color border = Color(0x38A7ABC9); // 0.22
+  static const Color focusBorder = Color(0x7338D9FF); // 0.45
   static const Color navOnBg = Color(0x1F38D9FF); // 0.12
   static const Color navOnBorder = Color(0x7338D9FF); // 0.45
   static const Color toggleOff = Color(0x40A7ABC9); // 0.25
   static const Color ghostFill = Color(0x0DA7ABC9); // 0.05
   static const Color white = Color(0xFFFFFFFF);
 }
+
+/// Light/dark palette. Wired into [ThemeData.extensions].
+@immutable
+class RwPalette extends ThemeExtension<RwPalette> {
+  final Color bg;
+  final Color bg2;
+  final Color card;
+  final Color cardHover;
+  final Color inputFill;
+  final Color text;
+  final Color muted;
+  final Color accent;
+  final Color accentHover;
+  final Color onAccent;
+  final Color violet;
+  final Color danger;
+  final Color dangerHover;
+  final Color warn;
+  final Color yellow;
+  final Color border;
+  final Color cardBorder;
+  final Color focusBorder;
+  final Color navOnBg;
+  final Color navOnBorder;
+  final Color toggleOff;
+  final Color ghostFill;
+  final Color white;
+  final List<BoxShadow> cardShadow;
+  final bool cosmicBackdrop;
+
+  const RwPalette({
+    required this.bg,
+    required this.bg2,
+    required this.card,
+    required this.cardHover,
+    required this.inputFill,
+    required this.text,
+    required this.muted,
+    required this.accent,
+    required this.accentHover,
+    required this.onAccent,
+    required this.violet,
+    required this.danger,
+    required this.dangerHover,
+    required this.warn,
+    required this.yellow,
+    required this.border,
+    required this.cardBorder,
+    required this.focusBorder,
+    required this.navOnBg,
+    required this.navOnBorder,
+    required this.toggleOff,
+    required this.ghostFill,
+    required this.white,
+    required this.cardShadow,
+    required this.cosmicBackdrop,
+  });
+
+  static const dark = RwPalette(
+    bg: Color(0xFF04030B),
+    bg2: Color(0xFF0A0820),
+    card: Color(0xFF15123A),
+    cardHover: Color(0xFF1C1848),
+    inputFill: Color(0x9904030B),
+    text: Color(0xFFEEF0FF),
+    muted: Color(0xFFA7ABC9),
+    accent: Color(0xFF38D9FF),
+    accentHover: Color(0xFF6BE3FF),
+    onAccent: Color(0xFF04030B),
+    violet: Color(0xFF7C5CFF),
+    danger: Color(0xFFFF3D5E),
+    dangerHover: Color(0xFFFF5A75),
+    warn: Color(0xFFFF7A2F),
+    yellow: Color(0xFFFFC069),
+    border: Color(0x38A7ABC9),
+    cardBorder: Color(0x38A7ABC9),
+    focusBorder: Color(0x7338D9FF),
+    navOnBg: Color(0x1F38D9FF),
+    navOnBorder: Color(0x7338D9FF),
+    toggleOff: Color(0x40A7ABC9),
+    ghostFill: Color(0x0DA7ABC9),
+    white: Color(0xFFFFFFFF),
+    cardShadow: [],
+    cosmicBackdrop: true,
+  );
+
+  static const light = RwPalette(
+    bg: Color(0xFFF4F5FB),
+    bg2: Color(0xFFFFFFFF),
+    card: Color(0xFFFFFFFF),
+    cardHover: Color(0xFFFFFFFF),
+    inputFill: Color(0xFFFFFFFF),
+    text: Color(0xFF14122B),
+    muted: Color(0xFF5D6180),
+    accent: Color(0xFF0A9CC2),
+    accentHover: Color(0xFF0889AB),
+    onAccent: Color(0xFFFFFFFF),
+    violet: Color(0xFF7C5CFF),
+    danger: Color(0xFFD41E48),
+    dangerHover: Color(0xFFB8193E),
+    warn: Color(0xFFFF7A2F),
+    yellow: Color(0xFFFFC069),
+    border: Color(0xFFDFE1EE),
+    cardBorder: Color(0xFFDFE1EE),
+    focusBorder: Color(0x730A9CC2),
+    navOnBg: Color(0x1F0A9CC2),
+    navOnBorder: Color(0x730A9CC2),
+    toggleOff: Color(0x405D6180),
+    ghostFill: Color(0x0D5D6180),
+    white: Color(0xFFFFFFFF),
+    cardShadow: [
+      BoxShadow(
+        color: Color(0x140A0820),
+        blurRadius: 16,
+        offset: Offset(0, 4),
+      ),
+    ],
+    cosmicBackdrop: false,
+  );
+
+  static RwPalette of(BuildContext context) {
+    return Theme.of(context).extension<RwPalette>() ?? RwPalette.dark;
+  }
+
+  TextStyle get textBrand => RwText.brand.copyWith(color: text);
+  TextStyle get textH1 => RwText.h1.copyWith(color: text);
+  TextStyle get textH1Narrow => RwText.h1Narrow.copyWith(color: text);
+  TextStyle get textH2 => RwText.h2.copyWith(color: text);
+  TextStyle get textH3 => RwText.h3.copyWith(color: text);
+  TextStyle get textBody => RwText.body.copyWith(color: text);
+  TextStyle get textBodyStrong => RwText.bodyStrong.copyWith(color: text);
+  TextStyle get textMuted => RwText.muted.copyWith(color: muted);
+  TextStyle get textLabel => RwText.label.copyWith(color: muted);
+  TextStyle get textNav => RwText.nav.copyWith(color: muted);
+  TextStyle get textBtn => RwText.btn.copyWith(color: onAccent);
+  TextStyle get textLink => RwText.link.copyWith(color: accent);
+  TextStyle get textNum => RwText.num.copyWith(color: text);
+  TextStyle get textNumSm => RwText.numSm.copyWith(color: text);
+  TextStyle get textError => RwText.error.copyWith(color: danger);
+
+  @override
+  RwPalette copyWith({
+    Color? bg,
+    Color? bg2,
+    Color? card,
+    Color? cardHover,
+    Color? inputFill,
+    Color? text,
+    Color? muted,
+    Color? accent,
+    Color? accentHover,
+    Color? onAccent,
+    Color? violet,
+    Color? danger,
+    Color? dangerHover,
+    Color? warn,
+    Color? yellow,
+    Color? border,
+    Color? cardBorder,
+    Color? focusBorder,
+    Color? navOnBg,
+    Color? navOnBorder,
+    Color? toggleOff,
+    Color? ghostFill,
+    Color? white,
+    List<BoxShadow>? cardShadow,
+    bool? cosmicBackdrop,
+  }) {
+    return RwPalette(
+      bg: bg ?? this.bg,
+      bg2: bg2 ?? this.bg2,
+      card: card ?? this.card,
+      cardHover: cardHover ?? this.cardHover,
+      inputFill: inputFill ?? this.inputFill,
+      text: text ?? this.text,
+      muted: muted ?? this.muted,
+      accent: accent ?? this.accent,
+      accentHover: accentHover ?? this.accentHover,
+      onAccent: onAccent ?? this.onAccent,
+      violet: violet ?? this.violet,
+      danger: danger ?? this.danger,
+      dangerHover: dangerHover ?? this.dangerHover,
+      warn: warn ?? this.warn,
+      yellow: yellow ?? this.yellow,
+      border: border ?? this.border,
+      cardBorder: cardBorder ?? this.cardBorder,
+      focusBorder: focusBorder ?? this.focusBorder,
+      navOnBg: navOnBg ?? this.navOnBg,
+      navOnBorder: navOnBorder ?? this.navOnBorder,
+      toggleOff: toggleOff ?? this.toggleOff,
+      ghostFill: ghostFill ?? this.ghostFill,
+      white: white ?? this.white,
+      cardShadow: cardShadow ?? this.cardShadow,
+      cosmicBackdrop: cosmicBackdrop ?? this.cosmicBackdrop,
+    );
+  }
+
+  @override
+  RwPalette lerp(ThemeExtension<RwPalette>? other, double t) {
+    if (other is! RwPalette) return this;
+    return t < 0.5 ? this : other;
+  }
+}
+
+RwPalette rwOf(BuildContext context) => RwPalette.of(context);
 
 class RwFonts {
   RwFonts._();
@@ -183,16 +394,26 @@ class RwText {
 class RwDecor {
   RwDecor._();
 
-  static BoxDecoration get panel => BoxDecoration(
-        color: RwColors.bg2Fill,
-        borderRadius: BorderRadius.circular(RwDim.radiusPanel),
-        border: Border.all(color: RwColors.border, width: 1),
-      );
+  static BoxDecoration get panel => panelOf(RwPalette.dark);
 
-  static BoxDecoration get input => BoxDecoration(
-        color: RwColors.inputFill,
+  static BoxDecoration panelOf(RwPalette p, {bool hover = false, bool focus = false}) {
+    return BoxDecoration(
+      color: hover ? p.cardHover : p.card,
+      borderRadius: BorderRadius.circular(RwDim.radiusPanel),
+      border: Border.all(
+        color: (hover || focus) ? p.focusBorder : p.cardBorder,
+        width: 1,
+      ),
+      boxShadow: p.cardShadow,
+    );
+  }
+
+  static BoxDecoration get input => inputOf(RwPalette.dark);
+
+  static BoxDecoration inputOf(RwPalette p) => BoxDecoration(
+        color: p.inputFill,
         borderRadius: BorderRadius.circular(RwDim.radiusField),
-        border: Border.all(color: RwColors.border, width: 1),
+        border: Border.all(color: p.cardBorder, width: 1),
       );
 
   static const LinearGradient avatar = LinearGradient(
@@ -227,6 +448,32 @@ class RwDecor {
     colors: [Color(0xFF14122B), Color(0xFF0A0820)],
   );
 
+  static const LinearGradient wallpaper1Light = LinearGradient(
+    begin: Alignment.topRight,
+    end: Alignment.bottomLeft,
+    colors: [
+      Color(0x337C5CFF),
+      Color(0xFFF4F5FB),
+      Color(0x330A9CC2),
+    ],
+  );
+
+  static const LinearGradient wallpaper2Light = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0x337C5CFF),
+      Color(0xFFF4F5FB),
+      Color(0x2214122B),
+    ],
+  );
+
+  static const LinearGradient wallpaperOfflineLight = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFE8EAF4), Color(0xFFF4F5FB)],
+  );
+
   static BoxDecoration cosmicBg() => const BoxDecoration(
         color: RwColors.bg,
         gradient: RadialGradient(
@@ -239,20 +486,20 @@ class RwDecor {
 }
 
 /// Shared button / switch / input styles wired into [ThemeData].
-ButtonStyle rwFilledButtonStyle() {
+ButtonStyle rwFilledButtonStyle([RwPalette p = RwPalette.dark]) {
   return ButtonStyle(
     elevation: const MaterialStatePropertyAll(0),
     backgroundColor: MaterialStateProperty.resolveWith((states) {
       if (states.contains(MaterialState.disabled)) {
-        return RwColors.accent.withOpacity(0.35);
+        return p.accent.withOpacity(0.35);
       }
       if (states.contains(MaterialState.hovered) ||
           states.contains(MaterialState.pressed)) {
-        return RwColors.accentHover;
+        return p.accentHover;
       }
-      return RwColors.accent;
+      return p.accent;
     }),
-    foregroundColor: const MaterialStatePropertyAll(RwColors.onAccent),
+    foregroundColor: MaterialStatePropertyAll(p.onAccent),
     shadowColor: const MaterialStatePropertyAll(Colors.transparent),
     overlayColor: const MaterialStatePropertyAll(Colors.transparent),
     padding: const MaterialStatePropertyAll(
@@ -260,75 +507,75 @@ ButtonStyle rwFilledButtonStyle() {
     shape: MaterialStatePropertyAll(RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(RwDim.radiusField),
     )),
-    textStyle: const MaterialStatePropertyAll(RwText.btn),
+    textStyle: MaterialStatePropertyAll(p.textBtn),
   );
 }
 
-ButtonStyle rwGhostButtonStyle() {
+ButtonStyle rwGhostButtonStyle([RwPalette p = RwPalette.dark]) {
   return ButtonStyle(
     elevation: const MaterialStatePropertyAll(0),
     backgroundColor: MaterialStateProperty.resolveWith((states) {
       if (states.contains(MaterialState.hovered)) {
-        return RwColors.ghostFill;
+        return p.ghostFill;
       }
-      return const Color(0x0DA7ABC9);
+      return p.ghostFill;
     }),
     foregroundColor: MaterialStateProperty.resolveWith((states) {
       if (states.contains(MaterialState.disabled)) {
-        return RwColors.muted.withOpacity(0.6);
+        return p.muted.withOpacity(0.6);
       }
-      return RwColors.text;
+      return p.text;
     }),
     shadowColor: const MaterialStatePropertyAll(Colors.transparent),
     overlayColor: const MaterialStatePropertyAll(Colors.transparent),
     padding: const MaterialStatePropertyAll(
         EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
-    side: const MaterialStatePropertyAll(BorderSide(color: RwColors.border)),
+    side: MaterialStatePropertyAll(BorderSide(color: p.cardBorder)),
     shape: MaterialStatePropertyAll(RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(RwDim.radiusField),
     )),
-    textStyle: const MaterialStatePropertyAll(RwText.bodyStrong),
+    textStyle: MaterialStatePropertyAll(p.textBodyStrong),
   );
 }
 
-SwitchThemeData rwSwitchTheme() {
+SwitchThemeData rwSwitchTheme([RwPalette p = RwPalette.dark]) {
   return SwitchThemeData(
     splashRadius: 0,
-    thumbColor: MaterialStateProperty.resolveWith((states) => RwColors.white),
+    thumbColor: MaterialStateProperty.resolveWith((states) => p.white),
     trackOutlineColor: const MaterialStatePropertyAll(Colors.transparent),
     trackColor: MaterialStateProperty.resolveWith((states) {
       if (states.contains(MaterialState.selected)) {
-        return RwColors.accent;
+        return p.accent;
       }
-      return RwColors.toggleOff;
+      return p.toggleOff;
     }),
   );
 }
 
-InputDecorationTheme rwInputDecorationTheme() {
+InputDecorationTheme rwInputDecorationTheme([RwPalette p = RwPalette.dark]) {
   return InputDecorationTheme(
     filled: true,
-    fillColor: RwColors.inputFill,
+    fillColor: p.inputFill,
     isDense: true,
-    hintStyle: RwText.muted,
-    labelStyle: RwText.label,
-    errorStyle: RwText.error,
+    hintStyle: p.textMuted,
+    labelStyle: p.textLabel,
+    errorStyle: p.textError,
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(RwDim.radiusField),
-      borderSide: const BorderSide(color: RwColors.border),
+      borderSide: BorderSide(color: p.cardBorder),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(RwDim.radiusField),
-      borderSide: const BorderSide(color: RwColors.border),
+      borderSide: BorderSide(color: p.cardBorder),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(RwDim.radiusField),
-      borderSide: const BorderSide(color: RwColors.accent, width: 1),
+      borderSide: BorderSide(color: p.focusBorder, width: 1),
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(RwDim.radiusField),
-      borderSide: const BorderSide(color: RwColors.danger),
+      borderSide: BorderSide(color: p.danger),
     ),
   );
 }

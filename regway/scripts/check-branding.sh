@@ -5,6 +5,8 @@ set -euo pipefail
 # Windows GitHub runners use cp1252 for Python stdout; keep UTF-8 for Cyrillic logs.
 export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
 RD="${1:-$(dirname "$0")/../rustdesk}"
+# shellcheck source=hbbs-key.sh
+source "$(cd "$(dirname "$0")" && pwd)/hbbs-key.sh"
 cd "$RD"
 
 # GitHub-hosted runners do not ship ripgrep; keep the same checks via grep.
@@ -73,8 +75,12 @@ need flutter/lib/regway/login_view.dart 'return Scaffold(' "login-gate: overlay 
 need flutter/lib/regway/shell.dart 'displayAppName()' "sidebar title uses display name with space"
 need flutter/lib/regway/computers.dart 'final statusNum = model.connectStatus;' "status widget uses real connect-status stream"
 need flutter/lib/regway/login_view.dart 'class RwLoginPage extends StatelessWidget' "login-gate: full-window Flutter gate"
-need flutter/lib/regway/widgets.dart 'bg = hover && enabled ? const Color(0xFFFF5A75) : RwColors.danger' "redesign: solid danger disconnect"
+need flutter/lib/regway/widgets.dart 'bg = hover && enabled ? p.dangerHover : p.danger' "redesign: solid danger disconnect"
 need flutter/lib/regway/theme.dart 'static const Color accent = Color(0xFF38D9FF);' "redesign: solid accent #38d9ff"
+need flutter/lib/regway/theme.dart 'static const Color card = Color(0xFF15123A);' "v2 dark cards #15123a"
+need flutter/lib/regway/theme.dart 'accent: Color(0xFF0A9CC2),' "v2 light buttons/switches #0a9cc2"
+need flutter/lib/regway/theme.dart 'danger: Color(0xFFD41E48),' "v2 light Отключиться #d41e48"
+need flutter/lib/desktop/pages/desktop_setting_page.dart "// Theme: Системная / Тёмная / Светлая (system, dark, light)" "theme radios: system / dark / light"
 need src/lang/ru.rs '("UserDisabled", "Аккаунт отключён администратором"),' "login-gate: UserDisabled ru"
 need src/lang/en.rs '("UserDisabled", "Account disabled by administrator"),' "login-gate: UserDisabled en"
 need flutter/lib/common.dart "if (name == 'RegWayRemote') return 'RegWay Remote';" "window title uses display name"
@@ -215,5 +221,29 @@ if [ "${REQUIRE_REAL_KEY:-0}" = 1 ]; then
   need libs/hbb_common/src/config.rs "(\"api-server\".to_owned(), \"https://$H\".to_owned())" "strict: API = https://$H"
   need libs/hbb_common/src/config.rs "pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([(\"api-server\".to_owned(), \"https://$H\".to_owned())]));" "strict: HARD_SETTINGS api-server = https://$H"
   if rg -q 'pub const RS_PUB_KEY: &str = "REPLACE_' libs/hbb_common/src/config.rs; then echo "FAIL strict: ключ-плейсхолдер"; fail=1; else echo "OK   strict: ключ не плейсхолдер"; fi
+  # Exact hbbs public key: fingerprint only, never print the full key.
+  got_key="$(python3 -c '
+import re, pathlib, sys
+s = pathlib.Path("libs/hbb_common/src/config.rs").read_text(encoding="utf-8")
+m = re.search(r"pub const RS_PUB_KEY: &str = \"([^\"]*)\";", s)
+sys.stdout.write(m.group(1) if m else "")
+')"
+  echo "compiled RS_PUB_KEY fingerprint: $(hbbs_key_fingerprint "$got_key")"
+  echo "expected hbbs fingerprint:       $(hbbs_key_fingerprint "$EXPECTED_HBBS_PUB_KEY")"
+  if [ "$got_key" != "$EXPECTED_HBBS_PUB_KEY" ]; then
+    echo "FAIL strict: compiled RS_PUB_KEY != expected hbbs public key"
+    echo "  compiled: $(hbbs_key_fingerprint "$got_key")"
+    echo "  expected: $(hbbs_key_fingerprint "$EXPECTED_HBBS_PUB_KEY")"
+    echo "  GitHub secret RS_PUB_KEY cannot be changed from this script."
+    fail=1
+  else
+    echo "OK   strict: compiled RS_PUB_KEY matches expected hbbs public key"
+  fi
+  if ! rg -q -F -- "$EXPECTED_HBBS_PUB_KEY" libs/hbb_common/src/config.rs; then
+    echo "FAIL strict: expected hbbs public key string not in config.rs"
+    fail=1
+  else
+    echo "OK   strict: expected hbbs public key string is in config.rs"
+  fi
 fi
 exit $fail
