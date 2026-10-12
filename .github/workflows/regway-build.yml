@@ -252,7 +252,26 @@ jobs:
 
       - name: Checksums
         shell: bash
-        run: cd out && sha256sum -- ./* | tee SHA256SUMS-windows.txt
+        run: |
+          set -euo pipefail
+          cd out
+          rm -f SHA256SUMS SHA256SUMS-windows.txt
+          echo "===== sha256sum ====="
+          : > SHA256SUMS
+          for f in *; do
+            [ -f "$f" ] || continue
+            [ "$f" = SHA256SUMS ] && continue
+            if command -v sha256sum >/dev/null 2>&1; then
+              line="$(sha256sum -- "$f")"
+            else
+              line="$(shasum -a 256 -- "$f")"
+            fi
+            printf '%s\n' "$line"
+            printf '%s\n' "$line" >> SHA256SUMS
+          done
+          echo "===== SHA256SUMS ====="
+          cat SHA256SUMS
+          [ -s SHA256SUMS ] || { echo "FAIL no files to hash in out/" >&2; exit 1; }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: RegWayRemote-windows-x86_64
@@ -440,7 +459,26 @@ jobs:
           rm -f "$RUNNER_TEMP/AuthKey.p8"
 
       - name: Checksums
-        run: cd out && shasum -a 256 ./*.dmg | tee "SHA256SUMS-macos-${{ matrix.job.arch }}.txt"
+        run: |
+          set -euo pipefail
+          cd out
+          rm -f SHA256SUMS SHA256SUMS-macos-*.txt
+          echo "===== sha256sum ====="
+          : > SHA256SUMS
+          for f in *; do
+            [ -f "$f" ] || continue
+            [ "$f" = SHA256SUMS ] && continue
+            if command -v sha256sum >/dev/null 2>&1; then
+              line="$(sha256sum -- "$f")"
+            else
+              line="$(shasum -a 256 -- "$f")"
+            fi
+            printf '%s\n' "$line"
+            printf '%s\n' "$line" >> SHA256SUMS
+          done
+          echo "===== SHA256SUMS ====="
+          cat SHA256SUMS
+          [ -s SHA256SUMS ] || { echo "FAIL no files to hash in out/" >&2; exit 1; }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: RegWayRemote-macos-${{ matrix.job.arch }}
