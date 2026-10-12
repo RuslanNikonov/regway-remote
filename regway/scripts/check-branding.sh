@@ -4,6 +4,36 @@
 set -euo pipefail
 RD="${1:-$(dirname "$0")/../rustdesk}"
 cd "$RD"
+
+# GitHub-hosted runners do not ship ripgrep; keep the same checks via grep.
+rg() {
+  # type -P looks up PATH only, so this function does not shadow a missing binary.
+  if [ -z "${REGWAY_FORCE_GREP:-}" ] && [ -n "$(type -P rg 2>/dev/null)" ]; then
+    command rg "$@"
+    return
+  fi
+  local grep_args=() has_F=0 recursive=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -n|-i|-q|-v|-c) grep_args+=("$1"); shift ;;
+      -F) grep_args+=(-F); has_F=1; shift ;;
+      --) shift; break ;;
+      -*) echo "unsupported rg flag: $1" >&2; return 2 ;;
+      *) break ;;
+    esac
+  done
+  [ "$has_F" -eq 0 ] && grep_args+=(-E)
+  local pattern="$1"; shift
+  if [ $# -gt 0 ]; then
+    local p
+    for p in "$@"; do
+      if [ -d "$p" ]; then recursive=1; break; fi
+    done
+  fi
+  [ "$recursive" -eq 1 ] && grep_args+=(-R -I)
+  grep "${grep_args[@]}" -- "$pattern" "$@"
+}
+
 PAT='rustdesk\.com|rs-ny|rs-sg|rs-cn'
 ALLOW='^(src/common\.rs:(1031|1175|3[0-9]{3}):|libs/hbb_common/src/socket_client\.rs:3(1[0-9]|2[0-9]):|libs/hbb_common/src/websocket\.rs:(4[89][0-9]|5[0-9][0-9]):)'
 hits="$(rg -n -i "$PAT" src libs/hbb_common/src flutter/lib || true)"
