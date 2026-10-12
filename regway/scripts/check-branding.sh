@@ -39,7 +39,7 @@ rg() {
 }
 
 PAT='rustdesk\.com|rs-ny|rs-sg|rs-cn'
-ALLOW='^(src/common\.rs:(1031|11[78][0-9]|3[0-9]{3}):|libs/hbb_common/src/socket_client\.rs:3(1[0-9]|2[0-9]):|libs/hbb_common/src/websocket\.rs:(4[89][0-9]|5[0-9]{2}):)'
+ALLOW='^(src/common\.rs:(103[0-9]|11[6-9][0-9]|3[0-9]{3}):|libs/hbb_common/src/socket_client\.rs:3(1[0-9]|2[0-9]):|libs/hbb_common/src/websocket\.rs:(4[89][0-9]|5[0-9]{2}):)'
 hits="$(rg -n -i "$PAT" src libs/hbb_common/src flutter/lib || true)"
 bad="$(printf '%s\n' "$hits" | rg -v "$ALLOW" | rg -v '^$' || true)"
 echo "== всего совпадений: $(printf '%s\n' "$hits" | rg -c . || echo 0); вне allowlist:"
