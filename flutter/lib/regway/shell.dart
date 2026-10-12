@@ -145,20 +145,14 @@ class RwSidebar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 26),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(9),
                   child: loadIcon(36),
                 ),
                 const SizedBox(width: 10),
-                Flexible(
-                  child: Text(
-                    displayAppName(),
-                    style: rwOf(context).textBrand.copyWith(fontSize: 14, height: 1.15),
-                    maxLines: 2,
-                    softWrap: true,
-                  ),
-                ),
+                const _RwWordmark(),
               ],
             ),
           ),
@@ -189,6 +183,59 @@ class RwSidebar extends StatelessWidget {
             ),
           const Spacer(),
           const _ProfileTile(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Two-line lockup «RegWay» / «Remote», 36px tall, aligned with the 36×36 icon.
+class _RwWordmark extends StatelessWidget {
+  const _RwWordmark();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = rwOf(context);
+    return SizedBox(
+      height: 36,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 18,
+            child: Text(
+              'RegWay',
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.clip,
+              style: TextStyle(
+                fontFamily: RwFonts.head,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                height: 18 / 16,
+                color: p.text,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          SizedBox(
+            height: 16,
+            child: Text(
+              'Remote',
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.clip,
+              style: TextStyle(
+                fontFamily: RwFonts.head,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+                height: 16 / 12,
+                letterSpacing: 0.04 * 12,
+                color: p.muted,
+              ),
+            ),
+          ),
         ],
       ),
     );

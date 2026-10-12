@@ -738,6 +738,15 @@ pub async fn start_server(is_server: bool, no_server: bool) {
             }
             Err(err) => {
                 log::info!("server not started: {err:?}, no_server: {no_server}");
+                #[cfg(target_os = "macos")]
+                if crate::platform::is_installed() && !no_server {
+                    // Do not become --server inside the GUI: that occupies IPC
+                    // and the LaunchAgent `--server` then exits immediately.
+                    crate::platform::macos::ensure_server_after_login();
+                    hbb_common::sleep(1.0).await;
+                    std::thread::spawn(|| start_server(false, true));
+                    return;
+                }
                 if no_server {
                     hbb_common::sleep(1.0).await;
                     std::thread::spawn(|| start_server(false, true));

@@ -529,6 +529,7 @@ class _RwThisComputerState extends State<RwThisComputer> {
   bool _hidePass = true;
   Timer? _statusTimer;
   bool _usingPublic = true;
+  bool _apiUnreachable = false;
 
   RxBool get _svcStopped {
     if (Get.isRegistered<RxBool>(tag: 'stop-service')) {
@@ -537,12 +538,19 @@ class _RwThisComputerState extends State<RwThisComputer> {
     return Get.put(false.obs, tag: 'stop-service');
   }
 
+  void _refreshLocalFlags() {
+    _apiUnreachable =
+        bind.mainGetLocalOption(key: 'rw-api-reachable') == 'N';
+  }
+
   @override
   void initState() {
     super.initState();
+    _refreshLocalFlags();
     _statusTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
       try {
         _usingPublic = await bind.mainIsUsingPublicServer();
+        _refreshLocalFlags();
         if (mounted) setState(() {});
       } catch (_) {}
     });
@@ -648,49 +656,101 @@ class _RwThisComputerState extends State<RwThisComputer> {
                     ],
                   ),
                   const Spacer(),
-                  Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: p.cardBorder),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: RwStatusDot(online: connected),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '${translate('Server')}: $statusText',
-                                style: p.textBodyStrong.copyWith(fontSize: 13),
-                                maxLines: 3,
-                                softWrap: true,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (!_usingPublic) ...[
-                          const SizedBox(height: 6),
-                          Text(translate('Encryption on'),
-                              textAlign: TextAlign.end,
-                              style: p.textMuted.copyWith(
-                                  fontSize: 12, fontWeight: FontWeight.w500)),
-                        ],
-                      ],
-                    ),
-                  ),
+                  if (!stopped && _apiUnreachable)
+                    _apiOfflineBanner(p)
+                  else
+                    _hbbsStatusPlaque(p, connected, statusText),
                 ],
               ),
             );
           });
         },
+      ),
+    );
+  }
+
+  Widget _apiOfflineBanner(RwPalette p) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: p.danger.withOpacity(0.45), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: p.danger,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  translate('No server connection'),
+                  style: p.textBodyStrong.copyWith(fontSize: 13, color: p.danger),
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            translate(
+                'Access closed. It will restore itself when the connection returns'),
+            style: p.textMuted.copyWith(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hbbsStatusPlaque(RwPalette p, bool connected, String statusText) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: p.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: RwStatusDot(online: connected),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${translate('Server')}: $statusText',
+                  style: p.textBodyStrong.copyWith(fontSize: 13),
+                  maxLines: 3,
+                  softWrap: true,
+                ),
+              ),
+            ],
+          ),
+          if (!_usingPublic) ...[
+            const SizedBox(height: 6),
+            Text(translate('Encryption on'),
+                textAlign: TextAlign.end,
+                style: p.textMuted
+                    .copyWith(fontSize: 12, fontWeight: FontWeight.w500)),
+          ],
+        ],
       ),
     );
   }

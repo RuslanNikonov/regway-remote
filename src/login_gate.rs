@@ -31,6 +31,9 @@ pub const CHECK_INTERVAL: Duration = Duration::from_secs(30);
 pub const TOKEN_VALIDATED_AT: &str = "rw-token-validated-at";
 pub const LOGIN_OK: &str = "rw-login-ok";
 pub const LOGIN_TOKEN: &str = "rw-login-token";
+/// `Y` after a successful `/api/currentUser`. `N` after a network timeout /
+/// unreachable API (grace, not revoke). Empty when there is no token.
+pub const API_REACHABLE: &str = "rw-api-reachable";
 const ACCESS_TOKEN: &str = "access_token";
 
 /// Result of one `/api/currentUser` (or equivalent) check. Pure: no I/O.
@@ -97,11 +100,22 @@ pub fn is_session_allowed() -> bool {
     is_within_offline_grace()
 }
 
+fn set_api_reachable(ok: Option<bool>) {
+    let v = match ok {
+        Some(true) => "Y",
+        Some(false) => "N",
+        None => "",
+    };
+    LocalConfig::set_option(API_REACHABLE.to_owned(), v.to_owned());
+    Config::set_option(API_REACHABLE.to_owned(), v.to_owned());
+}
+
 pub fn mark_validated() {
     let now = unix_now().to_string();
     LocalConfig::set_option(TOKEN_VALIDATED_AT.to_owned(), now.clone());
     Config::set_option(TOKEN_VALIDATED_AT.to_owned(), now);
     Config::set_option(LOGIN_OK.to_owned(), "Y".to_owned());
+    set_api_reachable(Some(true));
     let token = access_token();
     if !token.is_empty() {
         Config::set_option(LOGIN_TOKEN.to_owned(), token);
@@ -129,6 +143,7 @@ pub fn revoke(reason: &str) {
     Config::set_option(LOGIN_OK.to_owned(), "N".to_owned());
     Config::set_option(LOGIN_TOKEN.to_owned(), "".to_owned());
     Config::set_option(TOKEN_VALIDATED_AT.to_owned(), "".to_owned());
+    set_api_reachable(None);
     close_incoming();
     close_outgoing();
 }
@@ -211,8 +226,9 @@ pub async fn revalidate() -> ResultType<bool> {
     let (status, resp_body) = match crate::post_request_with_status(url, body, &header).await {
         Ok((status, body)) => (Some(status), body),
         Err(err) => {
-            log::warn!("login-gate: currentUser unreachable (network error, not 401): {err:?}");
-            return Ok(apply_outcome(AuthCheckOutcome::Grace, "network error"));
+            // Timeout / DNS / TLS: not a 401. Stay inside OFFLINE_GRACE.
+            log::warn!("login-gate: currentUser unreachable (network timeout/error, not 401): {err:?}");
+            return Ok(apply_outcome(AuthCheckOutcome::Grace, "network timeout"));
         }
     };
     let outcome = decide_auth_check(status, &resp_body);
@@ -241,6 +257,7 @@ fn apply_outcome(outcome: AuthCheckOutcome, reason: &str) -> bool {
             false
         }
         AuthCheckOutcome::Grace => {
+            set_api_reachable(Some(false));
             let ok = is_within_offline_grace();
             if !ok {
                 revoke("offline grace expired");
@@ -321,6 +338,19 @@ mod tests {
     #[test]
     fn network_error_uses_grace_not_revoke() {
         assert_eq!(decide_auth_check(None, ""), AuthCheckOutcome::Grace);
+    }
+
+    #[test]
+    fn timeout_does_not_revoke() {
+        // post_request_with_status Err (timeout) is mapped to status=None.
+        assert_eq!(
+            decide_auth_check(None, "timed out"),
+            AuthCheckOutcome::Grace
+        );
+        assert_ne!(
+            decide_auth_check(None, "timed out"),
+            AuthCheckOutcome::Revoke
+        );
     }
 
     #[test]

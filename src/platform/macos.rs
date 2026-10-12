@@ -42,6 +42,70 @@ static PRIVILEGES_SCRIPTS_DIR: Dir =
     include_dir!("$CARGO_MANIFEST_DIR/src/platform/privileges_scripts");
 static mut LATEST_SEED: i32 = 0;
 
+/// Paths written by install.scpt / daemon.plist after `correct_app_name`.
+/// Must stay `com.carriez.{APP_NAME}_*` — not `get_full_name()` (`{ORG}.{APP}`),
+/// which never matches the files on disk and left `--server` unloaded.
+fn daemon_plist_path() -> String {
+    format!(
+        "/Library/LaunchDaemons/com.carriez.{}_service.plist",
+        crate::get_app_name()
+    )
+}
+fn agent_plist_path() -> String {
+    format!(
+        "/Library/LaunchAgents/com.carriez.{}_server.plist",
+        crate::get_app_name()
+    )
+}
+fn daemon_label() -> String {
+    format!("com.carriez.{}_service", crate::get_app_name())
+}
+fn agent_label() -> String {
+    format!("com.carriez.{}_server", crate::get_app_name())
+}
+
+/// After login, make sure the user `--server` process exists.
+/// LaunchAgent should start it; if it is missing we kickstart then spawn.
+pub fn ensure_server_after_login() {
+    if hbb_common::config::option2bool(
+        "stop-service",
+        &hbb_common::config::Config::get_option("stop-service"),
+    ) {
+        return;
+    }
+    if is_prelogin() {
+        return;
+    }
+    if crate::check_process("--server", false) {
+        return;
+    }
+    let uid = get_active_userid();
+    let label = agent_label();
+    let plist = agent_plist_path();
+    if !uid.is_empty() && uid != "0" {
+        let gui = format!("gui/{uid}/{label}");
+        let _ = Command::new("launchctl")
+            .args(["bootstrap", &format!("gui/{uid}"), &plist])
+            .status();
+        let _ = Command::new("launchctl")
+            .args(["kickstart", "-k", &gui])
+            .status();
+    } else {
+        let _ = Command::new("launchctl")
+            .args(["load", "-w", &plist])
+            .status();
+    }
+    if crate::check_process("--server", false) {
+        log::info!("--server is running after launchctl kickstart");
+        return;
+    }
+    match run_as_user(vec!["--server"]) {
+        Ok(Some(_)) => log::info!("spawned --server as uid {uid}"),
+        Ok(None) => log::warn!("run_as_user --server returned None"),
+        Err(err) => log::error!("Failed to start --server: {err}"),
+    }
+}
+
 #[inline]
 fn get_update_temp_dir() -> PathBuf {
     let euid = unsafe { hbb_common::libc::geteuid() };
@@ -187,12 +251,10 @@ pub fn install_service() -> bool {
 // No need to merge the existing dup code, because the code in these two functions are too critical.
 // New code should be written in a common function.
 pub fn is_installed_daemon(prompt: bool) -> bool {
-    let daemon = format!("{}_service.plist", crate::get_full_name());
-    let agent = format!("{}_server.plist", crate::get_full_name());
-    let agent_plist_file = format!("/Library/LaunchAgents/{}", agent);
+    let agent_plist_file = agent_plist_path();
     if !prompt {
         // in macos 13, there is new way to check if they are running or enabled, https://developer.apple.com/documentation/servicemanagement/updating-helper-executables-from-earlier-versions-of-macos#Respond-to-changes-in-System-Settings
-        if !std::path::Path::new(&format!("/Library/LaunchDaemons/{}", daemon)).exists() {
+        if !std::path::Path::new(&daemon_plist_path()).exists() {
             return false;
         }
         if !std::path::Path::new(&agent_plist_file).exists() {
@@ -238,11 +300,11 @@ pub fn is_installed_daemon(prompt: bool) -> bool {
                 let installed = std::path::Path::new(&agent_plist_file).exists();
                 log::info!("Agent file {} installed: {}", agent_plist_file, installed);
                 if installed {
-                    log::info!("launch server");
-                    std::process::Command::new("launchctl")
-                        .args(&["load", "-w", &agent_plist_file])
-                        .status()
-                        .ok();
+                    log::info!("kickstart daemon and --server after install");
+                    let _ = Command::new("launchctl")
+                        .args(["kickstart", "-k", &format!("system/{}", daemon_label())])
+                        .status();
+                    ensure_server_after_login();
                 }
             }
         }
@@ -335,14 +397,8 @@ fn write_plist_atomically(path: &str, body: &str) -> ResultType<()> {
 }
 
 pub fn write_plists() -> ResultType<()> {
-    let daemon_plist_path = format!(
-        "/Library/LaunchDaemons/com.carriez.{}_service.plist",
-        crate::get_app_name()
-    );
-    let agent_plist_path = format!(
-        "/Library/LaunchAgents/com.carriez.{}_server.plist",
-        crate::get_app_name()
-    );
+    let daemon_plist_path = daemon_plist_path();
+    let agent_plist_path = agent_plist_path();
     let Some(daemon_plist) = PRIVILEGES_SCRIPTS_DIR.get_file("daemon.plist") else {
         bail!("daemon.plist not found in embedded resources");
     };
@@ -384,8 +440,7 @@ pub fn uninstall_service(show_new_window: bool, sync: bool) -> bool {
                 log::error!("run osascript failed: {}", e);
             }
             _ => {
-                let agent = format!("{}_server.plist", crate::get_full_name());
-                let agent_plist_file = format!("/Library/LaunchAgents/{}", agent);
+                let agent_plist_file = agent_plist_path();
                 let uninstalled = !std::path::Path::new(&agent_plist_file).exists();
                 log::info!(
                     "Agent file {} uninstalled: {}",
@@ -400,7 +455,7 @@ pub fn uninstall_service(show_new_window: bool, sync: bool) -> bool {
                     }
                     crate::ipc::set_option("stop-service", "Y");
                     std::process::Command::new("launchctl")
-                        .args(&["remove", &format!("{}_server", crate::get_full_name())])
+                        .args(&["remove", &agent_label()])
                         .status()
                         .ok();
                     if show_new_window {
@@ -790,72 +845,32 @@ pub fn lock_screen() {
 }
 
 /// Starts the macOS system service IPC listener and the background
-/// silent auto-update thread.
+/// silent auto-update thread. A watchdog starts `--server` after login
+/// if the LaunchAgent did not (old `service` leftover, agent not loaded).
 pub fn start_os_service() {
     log::info!("Username: {}", crate::username());
     // Silent auto-update — runs as root via LaunchDaemon, no osascript dialog needed
     crate::updater::start_auto_update_macos();
-    if let Err(err) = crate::ipc::start("_service") {
-        log::error!("Failed to start ipc_service: {}", err);
-    }
-
-    /* // mouse/keyboard works in prelogin now with launchctl asuser.
-       // below can avoid multi-users logged in problem, but having its own below problem.
-       // Not find a good way to start --cm without root privilege (affect file transfer).
-       // one way is to start with `launchctl asuser <uid> open -n -a /Applications/RustDesk.app/ --args --cm`,
-       // this way --cm is started with the user privilege, but we will have problem to start another RustDesk.app
-       // with open in explorer.
-        use std::sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        };
-        let running = Arc::new(AtomicBool::new(true));
-        let r = running.clone();
-        let mut uid = "".to_owned();
-        let mut server: Option<std::process::Child> = None;
-        if let Err(err) = ctrlc::set_handler(move || {
-            r.store(false, Ordering::SeqCst);
-        }) {
-            println!("Failed to set Ctrl-C handler: {}", err);
-        }
-        while running.load(Ordering::SeqCst) {
-            let tmp = get_active_userid();
-            let mut start_new = false;
-            if tmp != uid && !tmp.is_empty() {
-                uid = tmp;
-                log::info!("active uid: {}", uid);
-                if let Some(ps) = server.as_mut() {
-                    hbb_common::allow_err!(ps.kill());
+    std::thread::spawn(|| {
+        let mut last_uid = "".to_owned();
+        loop {
+            let uid = get_active_userid();
+            if uid != last_uid {
+                log::info!("active uid: {uid}");
+                last_uid = uid.clone();
+                if !uid.is_empty() && uid != "0" {
+                    ensure_server_after_login();
                 }
-            }
-            if let Some(ps) = server.as_mut() {
-                match ps.try_wait() {
-                    Ok(Some(_)) => {
-                        server = None;
-                        start_new = true;
-                    }
-                    _ => {}
-                }
-            } else {
-                start_new = true;
-            }
-            if start_new {
-                match run_as_user("--server") {
-                    Ok(Some(ps)) => server = Some(ps),
-                    Err(err) => {
-                        log::error!("Failed to start server: {}", err);
-                    }
-                    _ => { /*no happen*/ }
-                }
+            } else if !uid.is_empty() && uid != "0" && !crate::check_process("--server", false)
+            {
+                ensure_server_after_login();
             }
             std::thread::sleep(std::time::Duration::from_millis(super::SERVICE_INTERVAL));
         }
-
-        if let Some(ps) = server.take().as_mut() {
-            hbb_common::allow_err!(ps.kill());
-        }
-        log::info!("Exit");
-    */
+    });
+    if let Err(err) = crate::ipc::start("_service") {
+        log::error!("Failed to start ipc_service: {}", err);
+    }
 }
 
 pub fn toggle_blank_screen(_v: bool) {
@@ -912,8 +927,7 @@ pub fn update_me() -> ResultType<()> {
 
     let app_name = crate::get_app_name();
     if is_installed_daemon && !is_service_stopped {
-        let agent = format!("{}_server.plist", crate::get_full_name());
-        let agent_plist_file = format!("/Library/LaunchAgents/{}", agent);
+        let agent_plist_file = agent_plist_path();
         update_daemon_agent(agent_plist_file, app_dir, true);
     } else {
         // `kill -9` may not work without "administrator privileges"

@@ -101,6 +101,7 @@ class UserModel {
         // Network error is not a 401. Keep the 24 h offline grace.
         debugPrint('login-gate: currentUser unreachable (network error, not 401): $e');
         networkError.value = e.toString();
+        await _setApiReachable(false);
         if (!_withinOfflineGrace()) {
           await reset(resetOther: true);
         }
@@ -129,11 +130,13 @@ class UserModel {
       await bind.mainSetLocalOption(key: 'rw-token-validated-at', value: now);
       await bind.mainSetOption(key: 'rw-token-validated-at', value: now);
       await bind.mainSetOption(key: 'rw-login-ok', value: 'Y');
+      await _setApiReachable(true);
     } catch (e) {
       debugPrint('Failed to refreshCurrentUser: $e');
       if (networkError.value.isEmpty) {
         networkError.value = e.toString();
       }
+      await _setApiReachable(false);
       if (!_withinOfflineGrace()) {
         await reset(resetOther: true);
       }
@@ -167,9 +170,16 @@ class UserModel {
     }
   }
 
+  Future<void> _setApiReachable(bool? ok) async {
+    final v = ok == null ? '' : (ok ? 'Y' : 'N');
+    await bind.mainSetLocalOption(key: 'rw-api-reachable', value: v);
+    await bind.mainSetOption(key: 'rw-api-reachable', value: v);
+  }
+
   Future<void> reset({bool resetOther = false}) async {
     await bind.mainSetLocalOption(key: 'access_token', value: '');
     await bind.mainSetLocalOption(key: 'user_info', value: '');
+    await _setApiReachable(null);
     if (resetOther) {
       await gFFI.abModel.reset();
       await gFFI.groupModel.reset();
