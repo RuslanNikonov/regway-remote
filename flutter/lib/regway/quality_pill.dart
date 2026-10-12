@@ -3,13 +3,19 @@ import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
 import '../common.dart';
+import '../common/shared_state.dart';
+import '../consts.dart';
 import '../models/model.dart';
 import 'theme.dart';
 
-/// v3 quality pill: delay + frame-loss bands, 3 s average, 3 s stale, 2 s color hold.
+/// v3 quality pill: 3 bars + latency, delay + loss bands, 3 s average,
+/// 3 s stale, 2 s color hold. Reads QualityStatus / test_delay / speed already
+/// pushed to Flutter — no extra probes. Packet loss is fps vs session peak
+/// fps (QualityStatus has no native loss field).
 const double kRwQualityDelayGoodMs = 80;
 const double kRwQualityDelayBadMs = 200;
 const double kRwQualityLossGoodPct = 1;
@@ -27,22 +33,24 @@ class RwQualityView {
   const RwQualityView({required this.band, this.delayMs, this.lossPct});
 }
 
+/// Green: ≤80 ms and ≤1% loss. Yellow: 81–200 ms or 1–5% loss.
+/// Red: >200 ms or >5% loss. Worse of the two metrics wins.
 RwQualityBand rwQualityBand({double? delayMs, double? lossPct}) {
   var band = RwQualityBand.good;
   var any = false;
   if (delayMs != null) {
     any = true;
-    if (delayMs >= kRwQualityDelayBadMs) {
+    if (delayMs > kRwQualityDelayBadMs) {
       band = RwQualityBand.bad;
-    } else if (delayMs >= kRwQualityDelayGoodMs) {
+    } else if (delayMs > kRwQualityDelayGoodMs) {
       band = RwQualityBand.warn;
     }
   }
   if (lossPct != null) {
     any = true;
-    if (lossPct >= kRwQualityLossBadPct) {
+    if (lossPct > kRwQualityLossBadPct) {
       band = _worse(band, RwQualityBand.bad);
-    } else if (lossPct >= kRwQualityLossGoodPct) {
+    } else if (lossPct > kRwQualityLossGoodPct) {
       band = _worse(band, RwQualityBand.warn);
     }
   }
@@ -66,7 +74,8 @@ class _Samp {
   const _Samp(this.at, this.delayMs, this.fps);
 }
 
-/// Rolling 3 s average of delay / frame-loss; color steps at most once per 2 s.
+/// Rolling 3 s average of delay / frame-loss (from QualityStatus fps);
+/// colour steps at most once per 2 s.
 class RwQualityTracker {
   final _samples = <_Samp>[];
   RwQualityBand _shown = RwQualityBand.none;
@@ -115,7 +124,7 @@ class RwQualityTracker {
         band != RwQualityBand.none &&
         _lastColorChange != null &&
         now.difference(_lastColorChange!) < kRwQualityColorHold) {
-      // keep shown color
+      // keep shown colour
     } else if (band != _shown) {
       _shown = band;
       _lastColorChange = now;
@@ -140,9 +149,38 @@ double? rwParseFps(String? raw) {
   return minFps;
 }
 
+Color rwQualityColor(RwPalette p, RwQualityBand band) {
+  switch (band) {
+    case RwQualityBand.good:
+      return p.cosmicBackdrop
+          ? const Color(0xFF34D399)
+          : const Color(0xFF15915A);
+    case RwQualityBand.warn:
+      return p.yellow;
+    case RwQualityBand.bad:
+      return p.danger;
+    case RwQualityBand.none:
+      return p.muted;
+  }
+}
+
+int rwQualityBarsFilled(RwQualityBand band) {
+  switch (band) {
+    case RwQualityBand.good:
+      return 3;
+    case RwQualityBand.warn:
+      return 2;
+    case RwQualityBand.bad:
+      return 1;
+    case RwQualityBand.none:
+      return 0;
+  }
+}
+
 class RwQualityPill extends StatefulWidget {
+  final String id;
   final FFI ffi;
-  const RwQualityPill({super.key, required this.ffi});
+  const RwQualityPill({super.key, required this.id, required this.ffi});
 
   @override
   State<RwQualityPill> createState() => _RwQualityPillState();
@@ -185,6 +223,35 @@ class _RwQualityPillState extends State<RwQualityPill> {
     }
   }
 
+  String _routeLabel() {
+    try {
+      final ct = ConnectionTypeState.find(widget.id);
+      if (ct.direct.value == ConnectionType.strIndirect) {
+        return translate('Via relay');
+      }
+      if (ct.direct.value != kInvalidValueStr) {
+        return translate('Direct');
+      }
+    } catch (_) {}
+    final d = widget.ffi.ffiModel.direct;
+    if (d == true) return translate('Direct');
+    if (d == false) return translate('Via relay');
+    return '—';
+  }
+
+  String _statusLabel(RwQualityBand band) {
+    switch (band) {
+      case RwQualityBand.good:
+        return translate('quality_good');
+      case RwQualityBand.warn:
+        return translate('quality_fair');
+      case RwQualityBand.bad:
+        return translate('quality_poor');
+      case RwQualityBand.none:
+        return translate('quality_unknown');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
@@ -196,61 +263,105 @@ class _RwQualityPillState extends State<RwQualityPill> {
           });
           final p = rwOf(context);
           final view = _view;
-          final Color color;
-          switch (view.band) {
-            case RwQualityBand.good:
-              color = p.accent;
-              break;
-            case RwQualityBand.warn:
-              color = p.yellow;
-              break;
-            case RwQualityBand.bad:
-              color = p.danger;
-              break;
-            case RwQualityBand.none:
-              color = p.muted;
-              break;
-          }
+          final color = rwQualityColor(p, view.band);
           final label = view.delayMs == null
               ? translate('— ms')
               : '${view.delayMs!.round()} ${translate('ms')}';
           final delayLine = view.delayMs == null
               ? translate('Delay: —')
-              : translate('Delay: {} ms').replaceFirst(
-                  '{}', '${view.delayMs!.round()}');
+              : translate('Delay: {} ms')
+                  .replaceFirst('{}', '${view.delayMs!.round()}');
           final lossLine = view.lossPct == null
               ? translate('Packet loss: —')
-              : translate('Packet loss: {}%').replaceFirst(
-                  '{}', view.lossPct!.toStringAsFixed(1));
-          final tip =
-              '$delayLine\n$lossLine\n${translate('Average over 3 s')}';
-          return Tooltip(
-            message: tip,
-            waitDuration: const Duration(milliseconds: 400),
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: color.withOpacity(0.45), width: 1),
-              ),
-              child: Text(
-                label,
-                maxLines: 1,
-                softWrap: false,
-                style: TextStyle(
-                  fontFamily: RwFonts.body,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  height: 16 / 12,
-                  color: color,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              : translate('Packet loss: {}%')
+                  .replaceFirst('{}', view.lossPct!.toStringAsFixed(1));
+          return Obx(() {
+            final tip = [
+              _statusLabel(view.band),
+              delayLine,
+              lossLine,
+              _routeLabel(),
+            ].join('\n');
+            return Tooltip(
+              message: tip,
+              waitDuration: const Duration(milliseconds: 400),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: p.card,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: color.withOpacity(0.45), width: 1),
+                  boxShadow: p.cardShadow,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _RwSignalBars(
+                      filled: rwQualityBarsFilled(view.band),
+                      color: color,
+                      empty: p.muted.withOpacity(0.35),
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: TextStyle(
+                        fontFamily: RwFonts.body,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        height: 16 / 12,
+                        color: color,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          );
+            );
+          });
         },
+      ),
+    );
+  }
+}
+
+class _RwSignalBars extends StatelessWidget {
+  final int filled;
+  final Color color;
+  final Color empty;
+  const _RwSignalBars({
+    required this.filled,
+    required this.color,
+    required this.empty,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 13,
+      height: 12,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _bar(0, 4),
+          const SizedBox(width: 2),
+          _bar(1, 8),
+          const SizedBox(width: 2),
+          _bar(2, 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _bar(int index, double height) {
+    return Container(
+      width: 3,
+      height: height,
+      decoration: BoxDecoration(
+        color: filled > index ? color : empty,
+        borderRadius: BorderRadius.circular(1),
       ),
     );
   }

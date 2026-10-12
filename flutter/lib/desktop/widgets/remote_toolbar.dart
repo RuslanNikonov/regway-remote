@@ -692,17 +692,14 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
           !_dockingOptionsInitialized.value) {
         return const SizedBox.shrink();
       }
-      // If toolbar is hidden, return empty widget
-      if (hide.value) {
-        return const SizedBox.shrink();
-      }
       final edge = _edge.value;
       final isHorizontal = _isHorizontalEdge(edge);
+      final toolbarHidden = hide.value;
 
       // Measure the live toolbar after every layout so the preview ghost can
       // match its actual footprint (collapsed handle vs expanded toolbar).
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_dragging.isTrue) return;
+        if (_dragging.isTrue || toolbarHidden) return;
         final ro = _toolbarKey.currentContext?.findRenderObject();
         if (ro is RenderBox && ro.hasSize) {
           final s = ro.size;
@@ -710,33 +707,42 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
         }
       });
 
-      final toolbar = Align(
-        alignment: _alignmentForEdge(edge, _fraction.value),
-        child: KeyedSubtree(
-          key: _toolbarKey,
-          child: collapse.isFalse
-              ? _buildToolbar(context, edge, isHorizontal)
-              : _buildDraggableCollapse(context, edge, isHorizontal),
-        ),
-      );
+      final toolbar = toolbarHidden
+          ? const SizedBox.shrink()
+          : Align(
+              alignment: _alignmentForEdge(edge, _fraction.value),
+              child: KeyedSubtree(
+                key: _toolbarKey,
+                child: collapse.isFalse
+                    ? _buildToolbar(context, edge, isHorizontal)
+                    : _buildDraggableCollapse(context, edge, isHorizontal),
+              ),
+            );
 
       // Always return the Stack — even when not dragging — so the toolbar's
       // position in the Element tree stays stable. Wrapping/unwrapping it
       // mid-drag was killing the Draggable's gesture state.
+      // Quality pill sits at the top-right, overlaid on the toolbar strip.
       return Stack(
         fit: StackFit.expand,
         children: [
-          IgnorePointer(
-            child: Obx(() {
-              final pe = _previewEdge.value;
-              final pf = _previewFraction.value;
-              if (!_dragging.isTrue || pe == null || pf == null) {
-                return const SizedBox.shrink();
-              }
-              return _buildDragPreview(context, pe, pf, _toolbarSize.value);
-            }),
-          ),
+          if (!toolbarHidden)
+            IgnorePointer(
+              child: Obx(() {
+                final pe = _previewEdge.value;
+                final pf = _previewFraction.value;
+                if (!_dragging.isTrue || pe == null || pf == null) {
+                  return const SizedBox.shrink();
+                }
+                return _buildDragPreview(context, pe, pf, _toolbarSize.value);
+              }),
+            ),
           toolbar,
+          Positioned(
+            top: 10,
+            right: 12,
+            child: RwQualityPill(id: widget.id, ffi: widget.ffi),
+          ),
         ],
       );
     });
@@ -806,7 +812,6 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       BuildContext context, _ToolbarEdge edge, bool isHorizontal) {
     final List<Widget> toolbarItems = [];
     toolbarItems.add(_SessionIdentity(id: widget.id, ffi: widget.ffi));
-    toolbarItems.add(RwQualityPill(ffi: widget.ffi));
     toolbarItems.add(_PinMenu(state: widget.state));
     toolbarItems.add(Obx(() {
       final privacyModeState = PrivacyModeState.find(widget.id);
