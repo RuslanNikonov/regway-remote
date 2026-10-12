@@ -342,12 +342,28 @@ index 0d46baf..8a77c73 100644
          return;
      }
      let opt = LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
-@@ -1159,7 +1159,7 @@ fn get_api_server_(api: String, custom: String) -> String {
+@@ -1131,11 +1131,12 @@ pub fn get_api_server(api: String, custom: String) -> String {
+     if res.ends_with('/') {
+         res.pop();
+     }
+-    if res.starts_with("https")
+-        && res.ends_with(":21114")
++    let api_http_port = config::RENDEZVOUS_PORT - 2;
++    if res.starts_with("https")
++        && res.ends_with(&format!(":{api_http_port}"))
+         && get_builtin_option(keys::OPTION_ALLOW_HTTPS_21114) != "Y"
+     {
+-        return res.replace(":21114", "");
++        return res.replace(&format!(":{api_http_port}"), "");
+     }
+     res
+ }
+@@ -1159,7 +1160,7 @@ fn get_api_server_(api: String, custom: String) -> String {
              return format!("http://{}", s);
          }
      }
 -    "https://admin.rustdesk.com".to_owned()
-+    "http://remote.regway.group:21114".to_owned()
++    "https://remote.regway.group".to_owned()
  }
  
  #[inline]

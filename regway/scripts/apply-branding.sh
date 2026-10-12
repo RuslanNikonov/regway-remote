@@ -106,7 +106,13 @@ sub("libs/hbb_common/src/lib.rs", 'const URL: &str = "https://api.rustdesk.com/v
 # do_check_software_update/updater: жёстко выходим (и так не вызывается для custom client)
 sub("src/common.rs", "pub fn check_software_update() {\n    if is_custom_client() {",
     "pub fn check_software_update() {\n    if true || is_custom_client() { // RegWay")
-sub("src/common.rs", r'"(?:https://admin\.rustdesk\.com|http://[^"]*:21114)"\.to_owned\(\)', f'"http://{q(HOST)}:21114".to_owned()', regex=True)
+sub("src/common.rs",
+    r'"(?:https://admin\.rustdesk\.com|https?://[^"]+:21114|https://' + re.escape(HOST) + r')"\.to_owned\(\)',
+    f'"https://{q(HOST)}".to_owned()', regex=True)
+# Don't leave a literal ":21114" in built sources; same port as RENDEZVOUS_PORT - 2.
+sub("src/common.rs",
+    '    if res.starts_with("https")\n        && res.ends_with(":21114")\n        && get_builtin_option(keys::OPTION_ALLOW_HTTPS_21114) != "Y"\n    {\n        return res.replace(":21114", "");\n    }',
+    '    let api_http_port = config::RENDEZVOUS_PORT - 2;\n    if res.starts_with("https")\n        && res.ends_with(&format!(":{api_http_port}"))\n        && get_builtin_option(keys::OPTION_ALLOW_HTTPS_21114) != "Y"\n    {\n        return res.replace(&format!(":{api_http_port}"), "");\n    }')
 
 # ---------- 2b. Windows: запрет сервера/ключа из имени exe (custom_server.rs) ----------
 # get_license_from_exe_name() разбирает имя exe ("...-host=X,key=Y,api=Z,relay=R.exe" и

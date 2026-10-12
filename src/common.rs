@@ -1131,11 +1131,12 @@ pub fn get_api_server(api: String, custom: String) -> String {
     if res.ends_with('/') {
         res.pop();
     }
+    let api_http_port = config::RENDEZVOUS_PORT - 2;
     if res.starts_with("https")
-        && res.ends_with(":21114")
+        && res.ends_with(&format!(":{api_http_port}"))
         && get_builtin_option(keys::OPTION_ALLOW_HTTPS_21114) != "Y"
     {
-        return res.replace(":21114", "");
+        return res.replace(&format!(":{api_http_port}"), "");
     }
     res
 }
@@ -1159,7 +1160,7 @@ fn get_api_server_(api: String, custom: String) -> String {
             return format!("http://{}", s);
         }
     }
-    "http://remote.regway.group:21114".to_owned()
+    "https://remote.regway.group".to_owned()
 }
 
 #[inline]
@@ -3193,7 +3194,7 @@ mod tests {
             "https://admin.example.com"
         ));
         assert!(should_use_tcp_proxy_for_api_url(
-            "https://admin.example.com:21114/api/login",
+            "https://admin.example.com:8443/api/login",
             "https://admin.example.com"
         ));
         assert!(!should_use_tcp_proxy_for_api_url(
@@ -3355,8 +3356,8 @@ mod tests {
     #[test]
     fn test_tcp_proxy_log_target_brackets_ipv6_host_with_port() {
         assert_eq!(
-            tcp_proxy_log_target("https://[2001:db8::1]:21114/api/heartbeat?token=secret"),
-            "https://[2001:db8::1]:21114/api/heartbeat"
+            tcp_proxy_log_target("https://[2001:db8::1]:8443/api/heartbeat?token=secret"),
+            "https://[2001:db8::1]:8443/api/heartbeat"
         );
     }
 

@@ -35,7 +35,7 @@ rg() {
 }
 
 PAT='rustdesk\.com|rs-ny|rs-sg|rs-cn'
-ALLOW='^(src/common\.rs:(1031|1175|3[0-9]{3}):|libs/hbb_common/src/socket_client\.rs:3(1[0-9]|2[0-9]):|libs/hbb_common/src/websocket\.rs:(4[89][0-9]|5[0-9][0-9]):)'
+ALLOW='^(src/common\.rs:(1031|117[0-9]|3[0-9]{3}):|libs/hbb_common/src/socket_client\.rs:3(1[0-9]|2[0-9]):|libs/hbb_common/src/websocket\.rs:(4[89][0-9]|5[0-9]{2}):)'
 hits="$(rg -n -i "$PAT" src libs/hbb_common/src flutter/lib || true)"
 bad="$(printf '%s\n' "$hits" | rg -v "$ALLOW" | rg -v '^$' || true)"
 echo "== всего совпадений: $(printf '%s\n' "$hits" | rg -c . || echo 0); вне allowlist:"
@@ -64,6 +64,16 @@ rg -q '"relay-server"\.to_owned\(\), "[A-Za-z0-9.-]+:21117"' libs/hbb_common/src
 # в коде не должно остаться неотключённого разбора имени exe
 if rg -n '^\s*get_custom_server_from_string\(&exe\)\s*$' src/platform/windows.rs; then echo "FAIL разбор имени exe активен"; fail=1; fi
 need src/lang/ru.rs '("Closed manually by web console", "Сеанс завершён администратором"),' "ru: «Сеанс завершён администратором»"
+need src/common.rs '"https://remote.regway.group".to_owned()' "fallback API = https://remote.regway.group (без порта)"
+need src/common.rs 'let api_http_port = config::RENDEZVOUS_PORT - 2;' "strip https API-порта через RENDEZVOUS_PORT-2, без литерала :21114"
+# :21114 must not appear in built sources. Tests that assert its absence live in regway/scripts/.
+if hits21114="$(rg -n -F ':21114' src libs flutter/lib || true)" && [ -n "$hits21114" ]; then
+  echo "FAIL :21114 в исходниках сборки:"
+  echo "$hits21114"
+  fail=1
+else
+  echo "OK   :21114 нет в src/ libs/ flutter/lib/"
+fi
 # Строгий режим (CI релиза): хосты ровно remote.regway.group
 if [ "${REQUIRE_REAL_KEY:-0}" = 1 ]; then
   H=remote.regway.group
