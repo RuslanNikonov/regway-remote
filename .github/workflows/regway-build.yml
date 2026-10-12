@@ -4,8 +4,6 @@
 # Репозиторий = форк RustDesk 1.5.0 с уже применённым брендингом; checkout в ./rustdesk,
 # затем regway/scripts/apply-branding.sh повторно (идемпотентно) подставляет ключ из secret RS_PUB_KEY.
 # Подпись Windows и подпись+нотаризация macOS выполняются ТОЛЬКО если заданы secrets.
-# Полная сборка Windows/macOS — только workflow_dispatch и теги v*.
-# Push в main — только лёгкая проверка брендинга (без Flutter/vcpkg).
 name: RegWay Remote build
 
 on:
@@ -23,7 +21,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: regway-build-${{ github.ref }}
+  # Per-commit group so this test build is not cancelled/queued behind other main runs.
+  group: regway-build-${{ github.sha }}
   cancel-in-progress: false
 
 env:
@@ -49,20 +48,7 @@ env:
   REQUIRE_REAL_KEY: ${{ (github.event_name == 'push' || inputs.release) && '1' || '0' }}
 
 jobs:
-  branding-check:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          path: rustdesk
-      - name: Branding (key from secret, strict host check)
-        run: |
-          bash rustdesk/regway/scripts/apply-branding.sh rustdesk
-          bash rustdesk/regway/scripts/check-branding.sh rustdesk
-
   generate-bridge:
-    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
