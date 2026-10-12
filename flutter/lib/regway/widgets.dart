@@ -18,11 +18,17 @@ class RwPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final body = Container(
-      width: width,
-      padding: padding ?? const EdgeInsets.all(18),
-      decoration: RwDecor.panel,
-      child: child,
+    final body = Material(
+      color: Colors.transparent,
+      child: Container(
+        width: width,
+        padding: padding ?? const EdgeInsets.all(18),
+        decoration: RwDecor.panel,
+        child: DefaultTextStyle(
+          style: RwText.body,
+          child: child,
+        ),
+      ),
     );
     if (expand) {
       return SizedBox.expand(child: body);
@@ -310,8 +316,11 @@ class RwTextField extends StatelessWidget {
                     focusedBorder: InputBorder.none,
                     filled: false,
                     isDense: true,
+                    // Hint only when there is no external label with the same text.
                     hintText: hint,
                     hintStyle: RwText.muted.copyWith(fontSize: 13),
+                    labelText: null,
+                    floatingLabelBehavior: FloatingLabelBehavior.never,
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),

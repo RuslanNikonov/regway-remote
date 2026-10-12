@@ -12,7 +12,6 @@ import '../consts.dart';
 import '../models/peer_model.dart';
 import '../models/platform_model.dart';
 import '../models/server_model.dart';
-import '../models/state_model.dart';
 import 'nav.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -484,7 +483,6 @@ class _RwQuickConnectState extends State<RwQuickConnect> {
           const SizedBox(height: 6),
           RwTextField(
             controller: _id,
-            hint: translate('Enter Remote ID'),
             inputFormatters: [IDTextInputFormatter()],
             onSubmitted: (_) => _go(),
           ),
@@ -493,7 +491,6 @@ class _RwQuickConnectState extends State<RwQuickConnect> {
           const SizedBox(height: 6),
           RwTextField(
             controller: _pass,
-            hint: translate('Password'),
             obscure: true,
             onSubmitted: (_) => _go(),
           ),
@@ -521,7 +518,7 @@ class _RwThisComputerState extends State<RwThisComputer> {
     if (Get.isRegistered<RxBool>(tag: 'stop-service')) {
       return Get.find<RxBool>(tag: 'stop-service');
     }
-    return false.obs;
+    return Get.put(false.obs, tag: 'stop-service');
   }
 
   @override
@@ -549,8 +546,21 @@ class _RwThisComputerState extends State<RwThisComputer> {
         builder: (context, model, _) {
           return Obx(() {
             final stopped = _svcStopped.value;
-            final ready = stateGlobal.svcStatus.value == SvcStatus.ready;
-            final connected = !stopped && ready;
+            // ServerModel polls bind.mainGetConnectStatus every 500ms.
+            // Do not use stateGlobal.svcStatus here: ConnectionPage (which
+            // used to write it) is no longer in the redesigned home tree.
+            final statusNum = model.connectStatus;
+            final connected = !stopped && statusNum == 1;
+            final String statusText;
+            if (stopped) {
+              statusText = translate('Service is not running');
+            } else if (statusNum == 1) {
+              statusText = translate('Ready');
+            } else if (statusNum == -1) {
+              statusText = translate('not_ready_status');
+            } else {
+              statusText = translate('connecting_status');
+            }
             return RwPanel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -628,20 +638,34 @@ class _RwThisComputerState extends State<RwThisComputer> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: RwColors.border),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        RwStatusDot(online: connected),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${translate('Server')}: ${translate(connected ? 'connected' : (stopped ? 'Service is not running' : 'connecting_status'))}',
-                            style: RwText.bodyStrong.copyWith(fontSize: 13),
-                          ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: RwStatusDot(online: connected),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${translate('Server')}: $statusText',
+                                style: RwText.bodyStrong.copyWith(fontSize: 13),
+                                maxLines: 3,
+                                softWrap: true,
+                              ),
+                            ),
+                          ],
                         ),
-                        if (!_usingPublic)
+                        if (!_usingPublic) ...[
+                          const SizedBox(height: 6),
                           Text(translate('Encryption on'),
+                              textAlign: TextAlign.end,
                               style: RwText.muted.copyWith(
                                   fontSize: 12, fontWeight: FontWeight.w500)),
+                        ],
                       ],
                     ),
                   ),

@@ -268,6 +268,8 @@ pub fn set_local_option(key: String, value: String) {
                     "".to_owned()
                 },
             );
+            // Wake the mediator immediately after login (or logout).
+            crate::RendezvousMediator::restart();
         }
     }
 }

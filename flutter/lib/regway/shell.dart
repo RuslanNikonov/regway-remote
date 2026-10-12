@@ -55,30 +55,33 @@ class RwShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       final m = RwMetrics.of(constraints);
-      return Container(
+      return Material(
         color: RwColors.bg,
-        child: Stack(
-          children: [
-            const Positioned.fill(child: _CosmicBackdrop()),
-            Padding(
-              padding: EdgeInsets.all(m.pad),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    width: m.sidebar,
-                    child: RwSidebar(nav: nav, onNav: onNav),
-                  ),
-                  SizedBox(width: m.gap),
-                  Expanded(child: child),
-                  if (rail != null) ...[
+        child: DefaultTextStyle(
+          style: RwText.body,
+          child: Stack(
+            children: [
+              const Positioned.fill(child: _CosmicBackdrop()),
+              Padding(
+                padding: EdgeInsets.all(m.pad),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: m.sidebar,
+                      child: RwSidebar(nav: nav, onNav: onNav),
+                    ),
                     SizedBox(width: m.gap),
-                    SizedBox(width: m.rail, child: rail),
+                    Expanded(child: child),
+                    if (rail != null) ...[
+                      SizedBox(width: m.gap),
+                      SizedBox(width: m.rail, child: rail),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     });
@@ -145,9 +148,10 @@ class RwSidebar extends StatelessWidget {
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
-                    bind.mainGetAppNameSync(),
-                    style: RwText.brand,
-                    overflow: TextOverflow.ellipsis,
+                    displayAppName(),
+                    style: RwText.brand.copyWith(fontSize: 14, height: 1.15),
+                    maxLines: 2,
+                    softWrap: true,
                   ),
                 ),
               ],

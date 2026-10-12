@@ -68,6 +68,10 @@ need src/login_gate.rs 'fn http_401_unauthorized_revokes' "login-gate: unit test
 need src/login_gate.rs 'fn network_error_uses_grace_not_revoke' "login-gate: unit test network error → grace"
 need src/server.rs 'crate::login_gate::refuse_incoming()' "login-gate: incoming refused without token"
 need src/client.rs 'crate::login_gate::refuse_outgoing()' "login-gate: outgoing refused without token"
+if rg -q 'login_gate::is_session_allowed()' src/rendezvous_mediator.rs; then echo "FAIL rendezvous gated on login (hbbs must register at boot)"; fail=1; else echo "OK   rendezvous starts at boot (not gated on login)"; fi
+need flutter/lib/regway/login_view.dart 'return Scaffold(' "login-gate: overlay wrapped in Scaffold/Material"
+need flutter/lib/regway/shell.dart 'displayAppName()' "sidebar title uses display name with space"
+need flutter/lib/regway/computers.dart 'final statusNum = model.connectStatus;' "status widget uses real connect-status stream"
 need flutter/lib/regway/login_view.dart 'class RwLoginPage extends StatelessWidget' "login-gate: full-window Flutter gate"
 need flutter/lib/regway/widgets.dart 'bg = hover && enabled ? const Color(0xFFFF5A75) : RwColors.danger' "redesign: solid danger disconnect"
 need flutter/lib/regway/theme.dart 'static const Color accent = Color(0xFF38D9FF);' "redesign: solid accent #38d9ff"

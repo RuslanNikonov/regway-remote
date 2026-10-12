@@ -132,6 +132,8 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
           if (gFFI.userModel.isLogin) {
             return const SizedBox.shrink();
           }
+          // Overlay is a Stack sibling of Scaffold, so it has no Material
+          // ancestor unless we wrap it (yellow double-underline otherwise).
           return const Positioned.fill(child: RwLoginPage());
         }),
       ],

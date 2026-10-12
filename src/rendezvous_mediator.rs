@@ -308,8 +308,9 @@ impl RendezvousMediator {
             let timeout = Arc::new(RwLock::new(CONNECT_TIMEOUT));
             let conn_start_time = Instant::now();
             *SOLVING_PK_MISMATCH.lock().await = "".to_owned();
+            // Register with hbbs at boot, same as 2113bcb. Login-gate still
+            // refuses incoming/outgoing sessions until a token is valid.
             if !config::option2bool("stop-service", &Config::get_option("stop-service"))
-                && crate::login_gate::is_session_allowed()
                 && !crate::platform::installing_service()
             {
                 let mut futs = Vec::new();
@@ -338,11 +339,6 @@ impl RendezvousMediator {
                 join_all(futs).await;
             } else {
                 server.write().unwrap().close_connections();
-                Config::reset_online();
-                // Re-check login-gate every second so a successful login
-                // registers with hbbs without waiting CONNECT_TIMEOUT.
-                sleep(1.).await;
-                continue;
             }
             Config::reset_online();
             let timeout = *timeout.read().unwrap();

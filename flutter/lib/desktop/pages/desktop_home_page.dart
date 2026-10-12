@@ -746,6 +746,20 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     super.initState();
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
+      // Redesign dropped ConnectionPage's OnlineStatusWidget; keep svcStatus
+      // in sync with the real rendezvous connect-status stream.
+      try {
+        final status = jsonDecode(await bind.mainGetConnectStatus())
+            as Map<String, dynamic>;
+        final statusNum = status['status_num'] as int;
+        if (statusNum == 0) {
+          stateGlobal.svcStatus.value = SvcStatus.connecting;
+        } else if (statusNum == 1) {
+          stateGlobal.svcStatus.value = SvcStatus.ready;
+        } else {
+          stateGlobal.svcStatus.value = SvcStatus.notReady;
+        }
+      } catch (_) {}
       final error = await bind.mainGetError();
       if (systemError != error) {
         systemError = error;

@@ -20,18 +20,24 @@ class RwLoginPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: RwColors.bg,
-      child: const Stack(
-        children: [
-          Positioned.fill(child: _LoginBackdrop()),
-          Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.all(24),
-              child: RwLoginCard(),
+    // Stack overlay in DesktopTabPage is not under the home Scaffold.
+    // Scaffold + DefaultTextStyle give Text / TextField / Checkbox a Material
+    // ancestor (no yellow double underline).
+    return Scaffold(
+      backgroundColor: RwColors.bg,
+      body: DefaultTextStyle(
+        style: RwText.body,
+        child: const Stack(
+          children: [
+            Positioned.fill(child: _LoginBackdrop()),
+            Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(24),
+                child: RwLoginCard(),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -227,7 +233,6 @@ class _RwLoginCardState extends State<RwLoginCard> {
           RwTextField(
             controller: username,
             focusNode: userFocus,
-            hint: translate('Email or login'),
             errorText: usernameMsg,
             onSubmitted: (_) => _onLogin(),
           ),
@@ -236,7 +241,6 @@ class _RwLoginCardState extends State<RwLoginCard> {
           const SizedBox(height: 6),
           RwTextField(
             controller: password,
-            hint: translate('Password'),
             obscure: hidePass,
             errorText: passwordMsg,
             onSubmitted: (_) => _onLogin(),
