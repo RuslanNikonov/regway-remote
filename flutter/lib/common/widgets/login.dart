@@ -11,6 +11,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../common.dart';
+import 'package:flutter_hbb/regway/nav.dart';
+import 'package:flutter_hbb/regway/theme.dart';
 import './dialog.dart';
 import './oidc_auth_status.dart';
 
@@ -654,11 +656,11 @@ class LoginWidgetUserPass extends StatelessWidget {
     return Padding(
         padding: EdgeInsets.all(0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 8.0),
             DialogTextField(
-                title: translate(DialogTextField.kUsernameTitle),
+                title: translate('Email or login'),
                 controller: username,
                 focusNode: userFocusNode,
                 prefixIcon: DialogTextField.kUsernameIcon,
@@ -669,28 +671,27 @@ class LoginWidgetUserPass extends StatelessWidget {
               reRequestFocus: true,
               errorText: passMsg,
             ),
-            // NOT use Offstage to wrap LinearProgressIndicator
-            if (isInProgress) const LinearProgressIndicator(),
-            const SizedBox(height: 12.0),
-            FittedBox(
-                child:
-                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Container(
-                height: 38,
-                width: 200,
-                child: Obx(() => ElevatedButton(
-                      child: Text(
-                        translate('Login'),
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      onPressed: curOP.value.isEmpty && !isInProgress
-                          ? () {
-                              onLogin();
-                            }
-                          : null,
-                    )),
+            if (isInProgress)
+              const LinearProgressIndicator(
+                color: Color(0xFF38D9FF),
+                backgroundColor: Color(0x40A7ABC9),
               ),
-            ])),
+            const SizedBox(height: 12.0),
+            SizedBox(
+              height: 42,
+              child: Obx(() => ElevatedButton(
+                    child: Text(
+                      translate('Login'),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    onPressed: curOP.value.isEmpty && !isInProgress
+                        ? () {
+                            onLogin();
+                          }
+                        : null,
+                  )),
+            ),
           ],
         ));
   }
@@ -937,7 +938,12 @@ Future<bool?> _openLoginDialog() async {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          translate('Login'),
+          bind.mainGetAppNameSync(),
+          style: const TextStyle(
+            fontFamily: 'Unbounded',
+            fontWeight: FontWeight.w600,
+            fontSize: 22,
+          ),
         ).marginOnly(top: MyTheme.dialogPadding),
         MouseRegion(
           onEnter: (_) => setState(() => isCloseHovered = true),
@@ -984,6 +990,20 @@ Future<bool?> _openLoginDialog() async {
             curOP: curOP,
             onLogin: onLogin,
             userFocusNode: userFocusNode,
+          ),
+          Align(
+            alignment: Alignment.center,
+            child: TextButton(
+              onPressed: () async {
+                await RwNav.workWithoutLogin();
+                onDialogCancel();
+              },
+              child: Text(
+                translate('Work without signing in'),
+                style: const TextStyle(
+                    color: RwColors.accent, fontWeight: FontWeight.w600),
+              ),
+            ),
           ),
           thirdAuthWidget(),
         ],

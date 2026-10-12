@@ -77,7 +77,7 @@ class _ButtonState extends State<Button> {
                       color: widget.isOutline
                           ? widget.textColor ??
                               Theme.of(context).textTheme.titleLarge?.color
-                          : Colors.white),
+                          : MyTheme.onAccent),
                 ).marginSymmetric(horizontal: 12),
               )),
         ));

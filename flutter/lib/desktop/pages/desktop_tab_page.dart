@@ -11,6 +11,7 @@ import 'package:window_manager/window_manager.dart';
 // import 'package:flutter/services.dart';
 
 import '../../common/shared_state.dart';
+import 'package:flutter_hbb/regway/nav.dart';
 
 class DesktopTabPage extends StatefulWidget {
   const DesktopTabPage({Key? key}) : super(key: key);
@@ -20,6 +21,24 @@ class DesktopTabPage extends StatefulWidget {
 
   static void onAddSetting(
       {SettingsTabKey initialPage = SettingsTabKey.general}) {
+    if (!bind.isIncomingOnly()) {
+      RwNav.go(RwNavId.settings);
+      try {
+        if (Get.isRegistered<PageController>(tag: 'settingPageController') &&
+            Get.isRegistered<Rx<SettingsTabKey>>(tag: 'settingPageTabKey')) {
+          final index = DesktopSettingPage.tabKeys.indexOf(initialPage);
+          if (index != -1) {
+            Get.find<PageController>(tag: 'settingPageController')
+                .jumpToPage(index);
+            Get.find<Rx<SettingsTabKey>>(tag: 'settingPageTabKey').value =
+                initialPage;
+          }
+        }
+      } catch (e) {
+        debugPrintStack(label: '$e');
+      }
+      return;
+    }
     try {
       DesktopTabController tabController = Get.find<DesktopTabController>();
       tabController.add(TabInfo(
@@ -97,7 +116,7 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
             body: DesktopTab(
               controller: tabController,
               tail: Offstage(
-                offstage: bind.isIncomingOnly() || bind.isDisableSettings(),
+                offstage: true,
                 child: ActionIcon(
                   message: 'Settings',
                   icon: IconFont.menu,
