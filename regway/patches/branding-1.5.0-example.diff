@@ -1,0 +1,636 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 76461d6..1d98035 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -4,7 +4,7 @@ version = "1.5.0"
+ authors = ["rustdesk <info@rustdesk.com>"]
+ edition = "2021"
+ build= "build.rs"
+-description = "RustDesk Remote Desktop"
++description = "RegWay Remote"
+ default-run = "rustdesk"
+ rust-version = "1.75"
+ 
+@@ -254,9 +254,9 @@ webrtc-util = { git = "https://github.com/rustdesk-org/webrtc", rev = "49c89bd8d
+ webrtc-sctp = { git = "https://github.com/rustdesk-org/webrtc", rev = "49c89bd8d30e6e62e4c1a96cee38fdc11f79ef63" }
+ 
+ [package.metadata.winres]
+-LegalCopyright = "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved."
+-ProductName = "RustDesk"
+-FileDescription = "RustDesk Remote Desktop"
++LegalCopyright = "Based on RustDesk (c) Purslane Tech Pte. Ltd., AGPL-3.0; modifications (c) RegWay"
++ProductName = "RegWay Remote"
++FileDescription = "RegWay Remote"
+ OriginalFilename = "rustdesk.exe"
+ 
+ [target.'cfg(target_os="windows")'.build-dependencies]
+@@ -274,8 +274,8 @@ docopt = "1.1"
+ tokio = { version = "1.44", features = ["test-util"] }
+ 
+ [package.metadata.bundle]
+-name = "RustDesk"
+-identifier = "com.carriez.rustdesk"
++name = "RegWayRemote"
++identifier = "com.regway.remote"
+ icon = ["res/32x32.png", "res/128x128.png", "res/128x128@2x.png"]
+ osx_minimum_system_version = "10.14"
+ 
+diff --git a/build.py b/build.py
+index 7df00f3..a585dec 100755
+--- a/build.py
++++ b/build.py
+@@ -946,10 +946,10 @@ def build_flutter_dmg(version, features):
+     mac_arch = 'arm64' if platform.machine().lower() in ('arm64', 'aarch64') else 'x86_64'
+     system2(
+         f'FLUTTER_XCODE_ARCHS={mac_arch} FLUTTER_XCODE_ONLY_ACTIVE_ARCH=YES flutter build macos --release')
+-    system2('cp -rf ../target/release/service ./build/macos/Build/Products/Release/RustDesk.app/Contents/MacOS/')
++    system2('cp -rf ../target/release/service ./build/macos/Build/Products/Release/RegWayRemote.app/Contents/MacOS/')
+     '''
+     system2(
+-        "create-dmg --volname \"RustDesk Installer\" --window-pos 200 120 --window-size 800 400 --icon-size 100 --app-drop-link 600 185 --icon RustDesk.app 200 190 --hide-extension RustDesk.app rustdesk.dmg ./build/macos/Build/Products/Release/RustDesk.app")
++        "create-dmg --volname \"RegWay Remote\" --window-pos 200 120 --window-size 800 400 --icon-size 100 --app-drop-link 600 185 --icon RustDesk.app 200 190 --hide-extension RustDesk.app rustdesk.dmg ./build/macos/Build/Products/Release/RegWayRemote.app")
+     os.rename("rustdesk.dmg", f"../rustdesk-{version}.dmg")
+     '''
+     os.chdir("..")
+diff --git a/flutter/lib/common.dart b/flutter/lib/common.dart
+index b80e0b5..9692af7 100644
+--- a/flutter/lib/common.dart
++++ b/flutter/lib/common.dart
+@@ -3738,7 +3738,7 @@ Widget loadPowered(BuildContext context) {
+     cursor: SystemMouseCursors.click,
+     child: GestureDetector(
+       onTap: () {
+-        launchUrl(Uri.parse('https://rustdesk.com'));
++        launchUrl(Uri.parse('https://remote.regway.group'));
+       },
+       child: Opacity(
+           opacity: 0.5,
+@@ -3993,7 +3993,7 @@ get defaultOptionAccessMode => isCustomClient ? 'custom' : '';
+ get defaultOptionApproveMode => isCustomClient ? 'password-click' : '';
+ 
+ bool whitelistNotEmpty() {
+-  // https://rustdesk.com/docs/en/self-host/client-configuration/advanced-settings/#whitelist
++  // https://remote.regway.group
+   final v = bind.mainGetOptionSync(key: kOptionWhitelist);
+   return v != '' && v != ',';
+ }
+diff --git a/flutter/lib/desktop/pages/connection_page.dart b/flutter/lib/desktop/pages/connection_page.dart
+index 1d4928b..abd90c2 100644
+--- a/flutter/lib/desktop/pages/connection_page.dart
++++ b/flutter/lib/desktop/pages/connection_page.dart
+@@ -41,7 +41,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
+   double? get height => bind.isIncomingOnly() ? null : em * 3;
+ 
+   void onUsePublicServerGuide() {
+-    const url = "https://rustdesk.com/pricing";
++    const url = "https://remote.regway.group";
+     canLaunchUrlString(url).then((can) {
+       if (can) {
+         launchUrlString(url);
+diff --git a/flutter/lib/desktop/pages/desktop_home_page.dart b/flutter/lib/desktop/pages/desktop_home_page.dart
+index 6d370cb..facb864 100644
+--- a/flutter/lib/desktop/pages/desktop_home_page.dart
++++ b/flutter/lib/desktop/pages/desktop_home_page.dart
+@@ -435,7 +435,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
+       final isToUpdate = (isWindows || isMacOS) && bind.mainIsInstalled();
+       String btnText = isToUpdate ? 'Update' : 'Download';
+       GestureTapCallback onPressed = () async {
+-        final Uri url = Uri.parse('https://rustdesk.com/download');
++        final Uri url = Uri.parse('https://remote.regway.group');
+         await launchUrl(url);
+       };
+       if (isToUpdate) {
+@@ -528,7 +528,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
+             marginTop: LinuxCards.isEmpty ? 20.0 : 5.0,
+             help: 'Help',
+             link:
+-                'https://rustdesk.com/docs/en/client/linux/#permissions-issue',
++                'https://remote.regway.group',
+             closeButton: true,
+             closeOption: keyShowSelinuxHelpTip,
+           ));
+@@ -539,13 +539,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
+             "Warning", "wayland_experiment_tip", "", () async {},
+             marginTop: LinuxCards.isEmpty ? 20.0 : 5.0,
+             help: 'Help',
+-            link: 'https://rustdesk.com/docs/en/client/linux/#x11-required'));
++            link: 'https://remote.regway.group'));
+       } else if (bind.mainIsLoginWayland()) {
+         LinuxCards.add(buildInstallCard("Warning",
+             "Login screen using Wayland is not supported", "", () async {},
+             marginTop: LinuxCards.isEmpty ? 20.0 : 5.0,
+             help: 'Help',
+-            link: 'https://rustdesk.com/docs/en/client/linux/#login-screen'));
++            link: 'https://remote.regway.group'));
+       }
+       if (LinuxCards.isNotEmpty) {
+         return Column(
+diff --git a/flutter/lib/desktop/pages/desktop_setting_page.dart b/flutter/lib/desktop/pages/desktop_setting_page.dart
+index 82f038c..a5d94e6 100644
+--- a/flutter/lib/desktop/pages/desktop_setting_page.dart
++++ b/flutter/lib/desktop/pages/desktop_setting_page.dart
+@@ -2554,7 +2554,7 @@ class _AboutState extends State<_About> {
+                       .marginSymmetric(vertical: 4.0)),
+               InkWell(
+                   onTap: () {
+-                    launchUrlString('https://rustdesk.com/privacy.html');
++                    launchUrlString('https://remote.regway.group');
+                   },
+                   child: Text(
+                     translate('Privacy Statement'),
+@@ -2562,7 +2562,7 @@ class _AboutState extends State<_About> {
+                   ).marginSymmetric(vertical: 4.0)),
+               InkWell(
+                   onTap: () {
+-                    launchUrlString('https://rustdesk.com');
++                    launchUrlString('https://remote.regway.group');
+                   },
+                   child: Text(
+                     translate('Website'),
+diff --git a/flutter/lib/desktop/pages/install_page.dart b/flutter/lib/desktop/pages/install_page.dart
+index fe94b38..ddb9643 100644
+--- a/flutter/lib/desktop/pages/install_page.dart
++++ b/flutter/lib/desktop/pages/install_page.dart
+@@ -187,9 +187,9 @@ class _InstallPageBodyState extends State<_InstallPageBody>
+                           InkWell(
+                             hoverColor: Colors.transparent,
+                             onTap: () => launchUrlString(
+-                                'https://rustdesk.com/privacy.html'),
++                                'https://remote.regway.group'),
+                             child: Tooltip(
+-                              message: 'https://rustdesk.com/privacy.html',
++                              message: 'https://remote.regway.group',
+                               child: Row(children: [
+                                 Icon(Icons.launch_outlined, size: 16)
+                                     .marginOnly(right: 5),
+diff --git a/flutter/lib/mobile/pages/connection_page.dart b/flutter/lib/mobile/pages/connection_page.dart
+index ff5dc82..d6d6fef 100644
+--- a/flutter/lib/mobile/pages/connection_page.dart
++++ b/flutter/lib/mobile/pages/connection_page.dart
+@@ -124,7 +124,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
+         ? const SizedBox(height: 0)
+         : InkWell(
+             onTap: () async {
+-              final url = 'https://rustdesk.com/download';
++              final url = 'https://remote.regway.group';
+               // https://pub.dev/packages/url_launcher#configuration
+               // https://developer.android.com/training/package-visibility/use-cases#open-urls-custom-tabs
+               //
+diff --git a/flutter/lib/mobile/pages/settings_page.dart b/flutter/lib/mobile/pages/settings_page.dart
+index 198613a..c0642e2 100644
+--- a/flutter/lib/mobile/pages/settings_page.dart
++++ b/flutter/lib/mobile/pages/settings_page.dart
+@@ -36,7 +36,7 @@ class SettingsPage extends StatefulWidget implements PageShape {
+   State<SettingsPage> createState() => _SettingsState();
+ }
+ 
+-const url = 'https://rustdesk.com/';
++const url = 'https://remote.regway.group';
+ 
+ enum KeepScreenOn {
+   never,
+@@ -1030,7 +1030,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
+                 title: Text(translate("Version: ") + version),
+                 value: Padding(
+                   padding: EdgeInsets.symmetric(vertical: 8),
+-                  child: Text('rustdesk.com',
++                  child: Text('regway.group',
+                       style: TextStyle(
+                         decoration: TextDecoration.underline,
+                       )),
+@@ -1063,7 +1063,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
+             SettingsTile(
+               title: Text(translate("Privacy Statement")),
+               onPressed: (context) =>
+-                  launchUrlString('https://rustdesk.com/privacy.html'),
++                  launchUrlString('https://remote.regway.group'),
+               leading: Icon(Icons.privacy_tip),
+             )
+           ],
+@@ -1176,12 +1176,12 @@ void showAbout(OverlayDialogManager dialogManager) {
+         Text('Version: $version'),
+         InkWell(
+             onTap: () async {
+-              const url = 'https://rustdesk.com/';
++              const url = 'https://remote.regway.group';
+               await launchUrl(Uri.parse(url));
+             },
+             child: Padding(
+               padding: EdgeInsets.symmetric(vertical: 8),
+-              child: Text('rustdesk.com',
++              child: Text('regway.group',
+                   style: TextStyle(
+                     decoration: TextDecoration.underline,
+                   )),
+diff --git a/flutter/macos/Runner/Configs/AppInfo.xcconfig b/flutter/macos/Runner/Configs/AppInfo.xcconfig
+index 4c6b155..74a7ffa 100644
+--- a/flutter/macos/Runner/Configs/AppInfo.xcconfig
++++ b/flutter/macos/Runner/Configs/AppInfo.xcconfig
+@@ -5,10 +5,10 @@
+ // 'flutter create' template.
+ 
+ // The application's name. By default this is also the title of the Flutter window.
+-PRODUCT_NAME = RustDesk
++PRODUCT_NAME = RegWayRemote
+ 
+ // The application's bundle identifier
+-PRODUCT_BUNDLE_IDENTIFIER = com.carriez.flutterHbb
++PRODUCT_BUNDLE_IDENTIFIER = com.regway.remote
+ 
+ // The copyright displayed in application information
+-PRODUCT_COPYRIGHT = Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved.
++PRODUCT_COPYRIGHT = Based on RustDesk (AGPL-3.0). Modifications (c) RegWay
+diff --git a/flutter/macos/Runner/Info.plist b/flutter/macos/Runner/Info.plist
+index 36ca81e..6ceea17 100644
+--- a/flutter/macos/Runner/Info.plist
++++ b/flutter/macos/Runner/Info.plist
+@@ -4,6 +4,8 @@
+ <dict>
+ 	<key>CFBundleDevelopmentRegion</key>
+ 	<string>$(DEVELOPMENT_LANGUAGE)</string>
++	<key>CFBundleDisplayName</key>
++	<string>RegWay Remote</string>
+ 	<key>CFBundleExecutable</key>
+ 	<string>$(EXECUTABLE_NAME)</string>
+ 	<key>CFBundleIconFile</key>
+@@ -26,10 +28,10 @@
+ 			<key>CFBundleURLIconFile</key>
+ 			<string></string>
+ 			<key>CFBundleURLName</key>
+-			<string>com.carriez.rustdesk</string>
++			<string>com.regway.remote</string>
+ 			<key>CFBundleURLSchemes</key>
+ 			<array>
+-				<string>rustdesk</string>
++				<string>regwayremote</string>
+ 			</array>
+ 		</dict>
+ 	</array>
+diff --git a/flutter/windows/runner/Runner.rc b/flutter/windows/runner/Runner.rc
+index 88d1854..b12dcf6 100644
+--- a/flutter/windows/runner/Runner.rc
++++ b/flutter/windows/runner/Runner.rc
+@@ -89,13 +89,13 @@ BEGIN
+     BEGIN
+         BLOCK "040904e4"
+         BEGIN
+-            VALUE "CompanyName", "Purslane Tech Pte. Ltd." "\0"
+-            VALUE "FileDescription", "RustDesk Remote Desktop" "\0"
++            VALUE "CompanyName", "RegWay" "\0"
++            VALUE "FileDescription", "RegWay Remote" "\0"
+             VALUE "FileVersion", VERSION_AS_STRING "\0"
+             VALUE "InternalName", "rustdesk" "\0"
+-            VALUE "LegalCopyright", "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved." "\0"
++            VALUE "LegalCopyright", "Based on RustDesk, AGPL-3.0. Modifications (c) RegWay" "\0"
+             VALUE "OriginalFilename", "rustdesk.exe" "\0"
+-            VALUE "ProductName", "RustDesk" "\0"
++            VALUE "ProductName", "RegWay Remote" "\0"
+             VALUE "ProductVersion", VERSION_AS_STRING "\0"
+         END
+     END
+diff --git a/flutter/windows/runner/main.cpp b/flutter/windows/runner/main.cpp
+index 747d6f5..47546cc 100644
+--- a/flutter/windows/runner/main.cpp
++++ b/flutter/windows/runner/main.cpp
+@@ -80,7 +80,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
+         command_line_arguments.end());
+   }
+ 
+-  std::wstring app_name = L"RustDesk";
++  std::wstring app_name = L"RegWayRemote";
+   FUNC_RUSTDESK_GET_APP_NAME get_rustdesk_app_name = (FUNC_RUSTDESK_GET_APP_NAME)GetProcAddress(hInstance, "get_rustdesk_app_name");
+   if (get_rustdesk_app_name) {
+     wchar_t app_name_buffer[512] = {0};
+diff --git a/libs/hbb_common b/libs/hbb_common
+--- a/libs/hbb_common
++++ b/libs/hbb_common
+@@ -1 +1 @@
+-Subproject commit 229b904508364c8997aad0fb5af57effac859f60
++Subproject commit 229b904508364c8997aad0fb5af57effac859f60-dirty
+diff --git a/src/client.rs b/src/client.rs
+index d3e66e7..c78129b 100644
+--- a/src/client.rs
++++ b/src/client.rs
+@@ -127,7 +127,7 @@ pub const SCRAP_OTHER_VERSION_OR_X11_REQUIRED: &str =
+ pub const SCRAP_XDP_PORTAL_UNAVAILABLE: &str =
+     "xdp-portal-unavailable";
+ pub const SCRAP_X11_REQUIRED: &str = "x11 expected";
+-pub const SCRAP_X11_REF_URL: &str = "https://rustdesk.com/docs/en/manual/linux/#x11-required";
++pub const SCRAP_X11_REF_URL: &str = "https://remote.regway.group";
+ 
+ #[cfg(not(target_os = "linux"))]
+ pub const AUDIO_BUFFER_MS: usize = 3000;
+@@ -4482,7 +4482,7 @@ lazy_static::lazy_static! {
+             msgtype: "error",
+             title: "Login Error",
+             text: "Login screen using Wayland is not supported",
+-            link: "https://rustdesk.com/docs/en/manual/linux/#login-screen",
++            link: "https://remote.regway.group",
+             try_again: true,
+         }), (LOGIN_MSG_NO_PASSWORD_ACCESS, LoginErrorMsgBox{
+             msgtype: "wait-remote-accept-nook",
+diff --git a/src/common.rs b/src/common.rs
+index 0d46baf..8a77c73 100644
+--- a/src/common.rs
++++ b/src/common.rs
+@@ -1018,7 +1018,7 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
+ }
+ 
+ pub fn check_software_update() {
+-    if is_custom_client() {
++    if true || is_custom_client() { // RegWay
+         return;
+     }
+     let opt = LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
+@@ -1159,7 +1159,7 @@ fn get_api_server_(api: String, custom: String) -> String {
+             return format!("http://{}", s);
+         }
+     }
+-    "https://admin.rustdesk.com".to_owned()
++    "http://remote.regway.group:21114".to_owned()
+ }
+ 
+ #[inline]
+diff --git a/src/core_main.rs b/src/core_main.rs
+index b5a451e..8b2be21 100644
+--- a/src/core_main.rs
++++ b/src/core_main.rs
+@@ -499,7 +499,7 @@ pub fn core_main() -> Option<Vec<String>> {
+             }
+             return None;
+         } else if args[0] == "--config" {
+-            if args.len() == 2 && !args[0].contains("host=") {
++            if false && args.len() == 2 { // RegWay: --config <server string> disabled
+                 if crate::platform::is_installed() && is_root() {
+                     // encrypted string used in renaming exe.
+                     let name = if args[1].ends_with(".exe") {
+diff --git a/src/hbbs_http/sync.rs b/src/hbbs_http/sync.rs
+index 728e1e8..707f22e 100644
+--- a/src/hbbs_http/sync.rs
++++ b/src/hbbs_http/sync.rs
+@@ -18,6 +18,8 @@ use serde_json::{json, Value};
+ const TIME_HEARTBEAT: Duration = Duration::from_secs(15);
+ const UPLOAD_SYSINFO_TIMEOUT: Duration = Duration::from_secs(120);
+ const TIME_CONN: Duration = Duration::from_secs(3);
++// RegWay: consecutive explicit HTTP 401 replies (token sent) before revoking
++const REGWAY_401_THRESHOLD: u32 = 2;
+ 
+ #[cfg(not(any(target_os = "ios")))]
+ lazy_static::lazy_static! {
+@@ -92,6 +94,7 @@ async fn start_hbbs_sync_async() {
+     let mut last_sent: Option<Instant> = None;
+     let mut info_uploaded = InfoUploaded::default();
+     let mut sysinfo_ver = "".to_owned();
++    let mut regway_401_count: u32 = 0;
+     loop {
+         tokio::select! {
+             _ = interval.tick() => {
+@@ -242,10 +245,35 @@ async fn start_hbbs_sync_async() {
+                 }
+                 let modified_at = LocalConfig::get_option("strategy_timestamp").parse::<i64>().unwrap_or(0);
+                 v["modified_at"] = json!(modified_at);
+-                let response = crate::post_request(url.clone(), v.to_string(), "").await;
++                // RegWay: send the account token and act on an explicit 401 only
++                let token = LocalConfig::get_option("access_token");
++                let header = if token.is_empty() {
++                    "".to_owned()
++                } else {
++                    format!("Authorization: Bearer {}", token)
++                };
++                let response = crate::post_request_with_status(url.clone(), v.to_string(), &header).await;
+                 if let Err(err) = &response {
+                     hbb_common::throttled_log!(API_LOG_INTERVAL, warn, "Heartbeat failed: {err:?}");
+                 }
++                let response = match response {
++                    Ok((401, _)) if !token.is_empty() => {
++                        regway_401_count += 1;
++                        log::warn!("Heartbeat: HTTP 401 ({}/{})", regway_401_count, REGWAY_401_THRESHOLD);
++                        if regway_401_count >= REGWAY_401_THRESHOLD {
++                            regway_401_count = 0;
++                            regway_revoke_sessions(&token);
++                        }
++                        continue;
++                    }
++                    Ok((status, s)) => {
++                        if (200..300).contains(&status) {
++                            regway_401_count = 0;
++                        }
++                        Ok(s)
++                    }
++                    Err(e) => Err(e),
++                };
+                 if let Ok(s) = response {
+                     if let Ok(mut rsp) = serde_json::from_str::<HashMap::<&str, Value>>(&s) {
+                         if rsp.remove("sysinfo").is_some() {
+@@ -278,6 +306,20 @@ async fn start_hbbs_sync_async() {
+     }
+ }
+ 
++// RegWay: the API explicitly rejected our token: close all incoming sessions, forget the token.
++#[cfg(not(any(target_os = "ios")))]
++fn regway_revoke_sessions(token: &str) {
++    let conns = Connection::alive_conns();
++    log::warn!("API rejected access token: closing {} incoming session(s)", conns.len());
++    if !conns.is_empty() {
++        SENDER.lock().unwrap().send(conns).ok();
++    }
++    if LocalConfig::get_option("access_token") == token {
++        LocalConfig::set_option("access_token".to_owned(), "".to_owned());
++        LocalConfig::set_option("user_info".to_owned(), "".to_owned());
++    }
++}
++
+ fn heartbeat_url() -> String {
+     let url = crate::common::get_api_server(
+         Config::get_option("api-server"),
+diff --git a/src/lang/en.rs b/src/lang/en.rs
+index ca61f35..b8f99ad 100644
+--- a/src/lang/en.rs
++++ b/src/lang/en.rs
+@@ -89,7 +89,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
+         ("android_version_audio_tip", "The current Android version does not support audio capture, please upgrade to Android 10 or higher."),
+         ("android_start_service_tip", "Tap [Start service] or enable [Screen capture] permission to start the screen sharing service."),
+         ("android_permission_may_not_change_tip", "Permissions for established connections may not be changed instantly until reconnected."),
+-        ("doc_mac_permission", "https://rustdesk.com/docs/en/client/mac/#enable-permissions"),
++        ("doc_mac_permission", "https://remote.regway.group"),
+         ("Ignore Battery Optimizations", "Ignore battery optimizations"),
+         ("android_open_battery_optimizations_tip", "If you want to disable this feature, please go to the next RustDesk application settings page, find and enter [Battery], Uncheck [Unrestricted]"),
+         ("remote_restarting_tip", "Remote device is restarting, please close this message box and reconnect with permanent password after a while"),
+@@ -186,7 +186,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
+         ("Connection failed due to inactivity", "Automatically disconnected due to inactivity"),
+         ("upgrade_rustdesk_server_pro_to_{}_tip", "Please upgrade RustDesk Server Pro to version {} or newer!"),
+         ("pull_group_failed_tip", "Failed to refresh group"),
+-        ("doc_fix_wayland", "https://rustdesk.com/docs/en/client/linux/#x11-required"),
++        ("doc_fix_wayland", "https://remote.regway.group"),
+         ("display_is_plugged_out_msg", "The display is plugged out, switch to the first display."),
+         ("selinux_tip", "SELinux is enabled on your device, which may prevent RustDesk from running properly as controlled side."),
+         ("id_input_tip", "You can input an ID, a direct IP, or a domain with a port (<domain>:<port>).\nIf you want to access a device on another server, please append the server address (<id>@<server_address>?key=<key_value>), for example,\n9123456234@192.168.16.1:21117?key=5Qbwsde3unUcJBtrx9ZkvUmwFNoExHzpryHuPUdqlWM=.\nIf you want to access a device on a public server, please input \"<id>@public\", the key is not needed for public server.\n\nIf you want to force the use of a relay connection on the first connection, add \"/r\" at the end of the ID, for example, \"9123456234/r\"."),
+diff --git a/src/platform/windows.rs b/src/platform/windows.rs
+index a3c3d68..9006c14 100644
+--- a/src/platform/windows.rs
++++ b/src/platform/windows.rs
+@@ -2106,7 +2106,9 @@ pub fn get_license_from_exe_name() -> ResultType<CustomServer> {
+     if let Ok(portable_exe) = std::env::var(PORTABLE_APPNAME_RUNTIME_ENV_KEY) {
+         exe = portable_exe;
+     }
+-    get_custom_server_from_string(&exe)
++    // RegWay: server/key override via exe name is disabled
++    let _ = exe;
++    hbb_common::bail!("exe-name server override disabled")
+ }
+ 
+ // We can't directly use `RegKey::set_value` to update the registry value, because it will fail with `ERROR_ACCESS_DENIED`
+@@ -4073,7 +4075,7 @@ fn get_license() -> Option<CustomServer> {
+         lic.host = get_reg("Host");
+         lic.api = get_reg("Api");
+     }
+-    if lic.key.is_empty() || lic.host.is_empty() {
++    if true || lic.key.is_empty() || lic.host.is_empty() { // RegWay: no registry/exe-name override
+         return None;
+     }
+     Some(lic)
+diff --git a/src/tray.rs b/src/tray.rs
+index 50e2de0..5705961 100644
+--- a/src/tray.rs
++++ b/src/tray.rs
+@@ -52,6 +52,7 @@ fn make_tray() -> hbb_common::ResultType<()> {
+ 
+     let (icon_rgba, icon_width, icon_height) = {
+         let image = load_icon_from_asset()
++            .filter(|_| false) // RegWay: use res/ tray icons
+             .unwrap_or(image::load_from_memory(icon).context("Failed to open icon path")?)
+             .into_rgba8();
+         let (width, height) = image.dimensions();
+diff --git a/src/ui/index.tis b/src/ui/index.tis
+index 5ca96f4..4743c81 100644
+--- a/src/ui/index.tis
++++ b/src/ui/index.tis
+@@ -93,7 +93,7 @@ class ConnectStatus: Reactor.Component {
+     }
+ 
+     event click $(#setup-server) () {
+-        handler.open_url("https://rustdesk.com/blog/id-relay-set/");
++        handler.open_url("https://remote.regway.group");
+     }
+ }
+ 
+@@ -601,8 +601,8 @@ class MyIdMenu: Reactor.Component {
+         msgbox("custom-nocancel-nook-hasclose", translate("About") + " " + name, "<div style='line-height: 2em'> \
+             <div>Version: " + handler.get_version() + " \
+             <div>Fingerprint: " + handler.get_fingerprint() + " \
+-            <div .link .custom-event url='https://rustdesk.com/privacy.html'>" + translate("Privacy Statement") + "</div> \
+-            <div .link .custom-event url='https://rustdesk.com'>" + translate("Website") + "</div> \
++            <div .link .custom-event url='https://remote.regway.group'>" + translate("Privacy Statement") + "</div> \
++            <div .link .custom-event url='https://remote.regway.group'>" + translate("Website") + "</div> \
+ 	    <div style='background: #2c8cff; color: white; padding: 1em; margin-top: 1em;'>Copyright &copy; 2026 Purslane Tech Pte. Ltd.\
+             <br />" + handler.get_license() + " \
+             <p style='font-weight: bold'>" + translate("Slogan_tip") + "</p>\
+@@ -834,10 +834,10 @@ class UpdateMe: Reactor.Component {
+     }
+ 
+     event click $(#install-me) {
+-        handler.open_url("https://rustdesk.com/download");
++        handler.open_url("https://remote.regway.group");
+         return;
+         if (!is_win) {
+-            handler.open_url("https://rustdesk.com");
++            handler.open_url("https://remote.regway.group");
+             return;
+         }
+         var url = software_update_url + '.' + handler.get_software_ext();
+@@ -1343,7 +1343,7 @@ event change $(#msgbox input[name='confirmation']) {
+ $(body).content(<div style="size:*"><App /><div #msgbox /></div>);
+ 
+ event click $(#powered-by) {
+-    handler.open_url("https://rustdesk.com");
++    handler.open_url("https://remote.regway.group");
+ }
+ 
+ event click $(#open-settings) (_, me) {
+diff --git a/src/ui/install.tis b/src/ui/install.tis
+index fad4071..04f1840 100644
+--- a/src/ui/install.tis
++++ b/src/ui/install.tis
+@@ -50,7 +50,7 @@ class Install: Reactor.Component {
+     }
+ 
+     event click $(#agreement) {
+-        view.open_url("http://rustdesk.com/privacy");
++        view.open_url("https://remote.regway.group");
+     }
+ 
+     event click $(#submit) {
+diff --git a/libs/hbb_common/src/config.rs b/libs/hbb_common/src/config.rs
+index 6fe1004..d507b0b 100644
+--- a/libs/hbb_common/src/config.rs
++++ b/libs/hbb_common/src/config.rs
+@@ -54,7 +54,7 @@ const SERIAL: i32 = 3;
+ 
+ #[cfg(target_os = "macos")]
+ lazy_static::lazy_static! {
+-    pub static ref ORG: RwLock<String> = RwLock::new("com.carriez".to_owned());
++    pub static ref ORG: RwLock<String> = RwLock::new("com.regway".to_owned());
+ }
+ 
+ type Size = (i32, i32, i32, i32);
+@@ -67,20 +67,20 @@ lazy_static::lazy_static! {
+     static ref STATUS: RwLock<Status> = RwLock::new(Status::load());
+     static ref TRUSTED_DEVICES: RwLock<(Vec<TrustedDevice>, bool)> = Default::default();
+     static ref ONLINE: Mutex<HashMap<String, i64>> = Default::default();
+-    pub static ref PROD_RENDEZVOUS_SERVER: RwLock<String> = RwLock::new("".to_owned());
++    pub static ref PROD_RENDEZVOUS_SERVER: RwLock<String> = RwLock::new("remote.regway.group".to_owned());
+     pub static ref EXE_RENDEZVOUS_SERVER: RwLock<String> = Default::default();
+-    pub static ref APP_NAME: RwLock<String> = RwLock::new("RustDesk".to_owned());
++    pub static ref APP_NAME: RwLock<String> = RwLock::new("RegWayRemote".to_owned());
+     static ref KEY_PAIR: Mutex<Option<KeyPair>> = Default::default();
+     static ref USER_DEFAULT_CONFIG: RwLock<(UserDefaultConfig, Instant)> = RwLock::new((UserDefaultConfig::load(), Instant::now()));
+     pub static ref NEW_STORED_PEER_CONFIG: Mutex<HashSet<String>> = Default::default();
+     pub static ref DEFAULT_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
+-    pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
++    pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("custom-rendezvous-server".to_owned(), "remote.regway.group".to_owned()), ("relay-server".to_owned(), "remote.regway.group:21117".to_owned()), ("api-server".to_owned(), "https://remote.regway.group".to_owned()), ("key".to_owned(), "REPLACE_WITH_CONTENT_OF_id_ed25519.pub".to_owned()), ("allow-auto-update".to_owned(), "N".to_owned())])); // RegWay
+     pub static ref DEFAULT_DISPLAY_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
+     pub static ref OVERWRITE_DISPLAY_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
+     pub static ref DEFAULT_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
+-    pub static ref OVERWRITE_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
++    pub static ref OVERWRITE_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("enable-check-update".to_owned(), "N".to_owned())])); // RegWay
+     pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
+-    pub static ref BUILTIN_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
++    pub static ref BUILTIN_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("hide-server-settings".to_owned(), "Y".to_owned()), ("allow-deep-link-server-settings".to_owned(), "N".to_owned())])); // RegWay
+ }
+ 
+ #[cfg(target_os = "android")]
+@@ -97,8 +97,8 @@ lazy_static::lazy_static! {
+     pub static ref APP_HOME_DIR: RwLock<String> = Default::default();
+ }
+ 
+-pub const LINK_DOCS_HOME: &str = "https://rustdesk.com/docs/en/";
+-pub const LINK_DOCS_X11_REQUIRED: &str = "https://rustdesk.com/docs/en/manual/linux/#x11-required";
++pub const LINK_DOCS_HOME: &str = "https://remote.regway.group";
++pub const LINK_DOCS_X11_REQUIRED: &str = "https://remote.regway.group";
+ 
+ lazy_static::lazy_static! {
+     pub static ref HELPER_URL: HashMap<&'static str, &'static str> = HashMap::from([
+@@ -114,8 +114,8 @@ const CHARS: &[char] = &[
+     'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+ ];
+ 
+-pub const RENDEZVOUS_SERVERS: &[&str] = &["rs-ny.rustdesk.com"];
+-pub const RS_PUB_KEY: &str = "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=";
++pub const RENDEZVOUS_SERVERS: &[&str] = &["remote.regway.group"];
++pub const RS_PUB_KEY: &str = "REPLACE_WITH_CONTENT_OF_id_ed25519.pub";
+ 
+ pub const RENDEZVOUS_PORT: i32 = 21116;
+ pub const RELAY_PORT: i32 = 21117;
+diff --git a/libs/hbb_common/src/lib.rs b/libs/hbb_common/src/lib.rs
+index 8bc7f09..774d5c4 100644
+--- a/libs/hbb_common/src/lib.rs
++++ b/libs/hbb_common/src/lib.rs
+@@ -508,7 +508,7 @@ pub const VER_TYPE_RUSTDESK_CLIENT: &str = "rustdesk-client";
+ pub const VER_TYPE_RUSTDESK_SERVER: &str = "rustdesk-server";
+ 
+ pub fn version_check_request(typ: String) -> (VersionCheckRequest, String) {
+-    const URL: &str = "https://api.rustdesk.com/version/latest";
++    const URL: &str = ""; // RegWay: upstream version check disabled
+ 
+     use sysinfo::System;
+     let system = System::new();

@@ -18,6 +18,8 @@ use serde_json::{json, Value};
 const TIME_HEARTBEAT: Duration = Duration::from_secs(15);
 const UPLOAD_SYSINFO_TIMEOUT: Duration = Duration::from_secs(120);
 const TIME_CONN: Duration = Duration::from_secs(3);
+// RegWay: consecutive explicit HTTP 401 replies (token sent) before revoking
+const REGWAY_401_THRESHOLD: u32 = 2;
 
 #[cfg(not(any(target_os = "ios")))]
 lazy_static::lazy_static! {
@@ -92,6 +94,7 @@ async fn start_hbbs_sync_async() {
     let mut last_sent: Option<Instant> = None;
     let mut info_uploaded = InfoUploaded::default();
     let mut sysinfo_ver = "".to_owned();
+    let mut regway_401_count: u32 = 0;
     loop {
         tokio::select! {
             _ = interval.tick() => {
@@ -242,10 +245,35 @@ async fn start_hbbs_sync_async() {
                 }
                 let modified_at = LocalConfig::get_option("strategy_timestamp").parse::<i64>().unwrap_or(0);
                 v["modified_at"] = json!(modified_at);
-                let response = crate::post_request(url.clone(), v.to_string(), "").await;
+                // RegWay: send the account token and act on an explicit 401 only
+                let token = LocalConfig::get_option("access_token");
+                let header = if token.is_empty() {
+                    "".to_owned()
+                } else {
+                    format!("Authorization: Bearer {}", token)
+                };
+                let response = crate::post_request_with_status(url.clone(), v.to_string(), &header).await;
                 if let Err(err) = &response {
                     hbb_common::throttled_log!(API_LOG_INTERVAL, warn, "Heartbeat failed: {err:?}");
                 }
+                let response = match response {
+                    Ok((401, _)) if !token.is_empty() => {
+                        regway_401_count += 1;
+                        log::warn!("Heartbeat: HTTP 401 ({}/{})", regway_401_count, REGWAY_401_THRESHOLD);
+                        if regway_401_count >= REGWAY_401_THRESHOLD {
+                            regway_401_count = 0;
+                            regway_revoke_sessions(&token);
+                        }
+                        continue;
+                    }
+                    Ok((status, s)) => {
+                        if (200..300).contains(&status) {
+                            regway_401_count = 0;
+                        }
+                        Ok(s)
+                    }
+                    Err(e) => Err(e),
+                };
                 if let Ok(s) = response {
                     if let Ok(mut rsp) = serde_json::from_str::<HashMap::<&str, Value>>(&s) {
                         if rsp.remove("sysinfo").is_some() {
@@ -275,6 +303,20 @@ async fn start_hbbs_sync_async() {
                 }
             }
         }
+    }
+}
+
+// RegWay: the API explicitly rejected our token: close all incoming sessions, forget the token.
+#[cfg(not(any(target_os = "ios")))]
+fn regway_revoke_sessions(token: &str) {
+    let conns = Connection::alive_conns();
+    log::warn!("API rejected access token: closing {} incoming session(s)", conns.len());
+    if !conns.is_empty() {
+        SENDER.lock().unwrap().send(conns).ok();
+    }
+    if LocalConfig::get_option("access_token") == token {
+        LocalConfig::set_option("access_token".to_owned(), "".to_owned());
+        LocalConfig::set_option("user_info".to_owned(), "".to_owned());
     }
 }
 

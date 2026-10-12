@@ -58,3 +58,28 @@ libsciter.dylib
 flutter/web/
 # libdrmtap is cloned at build time by build.py (not a submodule)
 /third_party/libdrmtap/
+
+# --- RegWay: секреты и ключи никогда не коммитим ---
+.env
+.env.*
+*.env
+!regway/branding.env
+.secrets/
+secrets/
+panel-admin.env
+*.pem
+*.key
+*.p12
+*.pfx
+*.p8
+*.keystore
+*.jks
+id_ed25519
+id_rsa
+id_ecdsa
+id_dsa
+# RegWay: наши ассеты (upstream игнорирует *png)
+!.github/assets/*.png
+!regway/branding/design/**/*.png
+!res/regway/*.png
+!regway/branding/design/icon/png/

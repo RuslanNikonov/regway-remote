@@ -2106,7 +2106,9 @@ pub fn get_license_from_exe_name() -> ResultType<CustomServer> {
     if let Ok(portable_exe) = std::env::var(PORTABLE_APPNAME_RUNTIME_ENV_KEY) {
         exe = portable_exe;
     }
-    get_custom_server_from_string(&exe)
+    // RegWay: server/key override via exe name is disabled
+    let _ = exe;
+    hbb_common::bail!("exe-name server override disabled")
 }
 
 // We can't directly use `RegKey::set_value` to update the registry value, because it will fail with `ERROR_ACCESS_DENIED`
@@ -4073,7 +4075,7 @@ fn get_license() -> Option<CustomServer> {
         lic.host = get_reg("Host");
         lic.api = get_reg("Api");
     }
-    if lic.key.is_empty() || lic.host.is_empty() {
+    if true || lic.key.is_empty() || lic.host.is_empty() { // RegWay: no registry/exe-name override
         return None;
     }
     Some(lic)

@@ -499,7 +499,7 @@ pub fn core_main() -> Option<Vec<String>> {
             }
             return None;
         } else if args[0] == "--config" {
-            if args.len() == 2 && !args[0].contains("host=") {
+            if false && args.len() == 2 { // RegWay: --config <server string> disabled
                 if crate::platform::is_installed() && is_root() {
                     // encrypted string used in renaming exe.
                     let name = if args[1].ends_with(".exe") {

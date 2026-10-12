@@ -1,0 +1,386 @@
+# RegWay Remote — сборка клиента (Windows x64 .exe/.msi, macOS x64/arm64 .dmg).
+# Основано на rustdesk/.github/workflows/flutter-build.yml (тег 1.5.0): те же версии
+# Flutter/Rust/vcpkg и те же шаги сборки; arm64-Windows, Linux, Android, iOS, sciter убраны.
+# Репозиторий = форк RustDesk 1.5.0 с уже применённым брендингом; checkout в ./rustdesk,
+# затем regway/scripts/apply-branding.sh повторно (идемпотентно) подставляет ключ из secret RS_PUB_KEY.
+# Подпись Windows и подпись+нотаризация macOS выполняются ТОЛЬКО если заданы secrets.
+name: RegWay Remote build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Требовать реальный ключ сервера (secret RS_PUB_KEY)"
+        type: boolean
+        default: true
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regway-build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # upstream (для справки): https://github.com/rustdesk/rustdesk, см. regway/UPSTREAM
+  UPSTREAM_TAG: "1.5.0"
+  VERSION: "1.5.0"
+  ARTIFACT_PREFIX: RegWayRemote
+  APP_NAME: RegWayRemote
+  RUST_VERSION: "1.75"
+  SCITER_RUST_VERSION: "1.75"
+  MAC_RUST_VERSION: "1.81"
+  LLVM_VERSION: "15.0.6"
+  FLUTTER_VERSION: "3.24.5"
+  BRIDGE_FLUTTER_VERSION: "3.22.3"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  CARGO_EXPAND_VERSION: "1.0.95"
+  VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  # Ключ — из secret. Хосты берутся только из branding.env; при REQUIRE_REAL_KEY=1
+  # apply-branding.sh и check-branding.sh требуют ровно remote.regway.group
+  # (ID), remote.regway.group:21117 (relay), https://remote.regway.group (API).
+  RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+  REQUIRE_REAL_KEY: ${{ (github.event_name == 'push' || inputs.release) && '1' || '0' }}
+
+jobs:
+  generate-bridge:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          path: rustdesk
+      - name: Branding (key from secret, strict host check)
+        run: |
+          bash rustdesk/regway/scripts/apply-branding.sh rustdesk
+          bash rustdesk/regway/scripts/check-branding.sh rustdesk
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y clang cmake curl gcc git g++ libclang-dev libgtk-3-dev llvm-dev nasm ninja-build pkg-config wget
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: "rustfmt"
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          prefix-key: bridge
+          workspaces: rustdesk
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.BRIDGE_FLUTTER_VERSION }}
+          cache: true
+      - name: Generate bridge
+        working-directory: rustdesk
+        run: |
+          cargo install cargo-expand --version "$CARGO_EXPAND_VERSION" --locked
+          cargo install flutter_rust_bridge_codegen --version "$FLUTTER_RUST_BRIDGE_VERSION" --features "uuid" --locked
+          sed -i -e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' flutter/pubspec.yaml
+          (cd flutter && flutter pub get)
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
+          cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bridge-artifact
+          path: |
+            rustdesk/src/bridge_generated.rs
+            rustdesk/src/bridge_generated.io.rs
+            rustdesk/flutter/lib/generated_bridge.dart
+            rustdesk/flutter/lib/generated_bridge.freezed.dart
+            rustdesk/flutter/macos/Runner/bridge_generated.h
+            rustdesk/flutter/ios/Runner/bridge_generated.h
+
+  build-windows-x64:
+    needs: generate-bridge
+    runs-on: windows-2022
+    env:
+      # Подпись (опционально): Azure Artifact Signing, бывш. Trusted Signing. Без этих secrets шаги подписи пропускаются.
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+      AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+      AZURE_CERT_PROFILE: ${{ secrets.AZURE_CERT_PROFILE }}
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          path: rustdesk
+      - name: Branding (key from secret, strict host check)
+        shell: bash
+        run: |
+          bash rustdesk/regway/scripts/apply-branding.sh rustdesk
+          bash rustdesk/regway/scripts/check-branding.sh rustdesk
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bridge-artifact
+          path: ./rustdesk
+      - uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0 # v2.0.9
+        with:
+          version: ${{ env.LLVM_VERSION }}
+      - uses: subosito/flutter-action@2783a3f08e1baf891508463f8c6653c258246225 # v2.12.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: x64
+      - name: Replace engine with rustdesk custom flutter engine (как в upstream)
+        run: |
+          flutter doctor -v
+          flutter precache --windows
+          Invoke-WebRequest -Uri https://github.com/rustdesk/engine/releases/download/main/windows-x64-release.zip -OutFile windows-x64-release.zip
+          Expand-Archive -Path windows-x64-release.zip -DestinationPath windows-x64-release
+          mv -Force windows-x64-release/*  C:/hostedtoolcache/windows/flutter/stable-${{ env.FLUTTER_VERSION }}-x64/bin/cache/artifacts/engine/windows-x64-release/
+      - name: Patch flutter
+        shell: bash
+        run: |
+          cp rustdesk/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff "$(dirname "$(dirname "$(which flutter)")")"
+          cd "$(dirname "$(dirname "$(which flutter)")")"
+          git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: ${{ env.SCITER_RUST_VERSION }}
+          targets: x86_64-pc-windows-msvc
+          components: "rustfmt"
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          prefix-key: windows-2022
+          workspaces: rustdesk
+      - uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
+        with:
+          vcpkgDirectory: C:\vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+      - name: Install vcpkg dependencies
+        shell: bash
+        working-directory: rustdesk
+        env:
+          VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-static
+        run: |
+          "$VCPKG_ROOT/vcpkg" install --triplet x64-windows-static --x-install-root="$VCPKG_ROOT/installed"
+      - name: Build
+        working-directory: rustdesk
+        run: |
+          python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec --vram
+          mv ./flutter/build/windows/x64/runner/Release ./rustdesk
+          Invoke-WebRequest -Uri https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip -OutFile usbmmidd_v2.zip
+          Expand-Archive usbmmidd_v2.zip -DestinationPath .
+          Remove-Item -Path usbmmidd_v2\Win32 -Recurse
+          Remove-Item -Path "usbmmidd_v2\deviceinstaller64.exe", "usbmmidd_v2\deviceinstaller.exe", "usbmmidd_v2\usbmmidd.bat"
+          mv -Force .\usbmmidd_v2 ./rustdesk
+          # Инсталлятор RustDesk ставит <APP_NAME>.exe; MSI (preprocess.py --app-name) ждёт это имя в dist.
+          mv ./rustdesk/rustdesk.exe "./rustdesk/${{ env.APP_NAME }}.exe"
+      - name: Copy Runner.res for portable packer
+        continue-on-error: true
+        shell: bash
+        working-directory: rustdesk
+        run: |
+          runner_res=$(find . -name "Runner.res" | head -n1)
+          [ -n "$runner_res" ] && cp "$runner_res" ./libs/portable/Runner.res
+
+      - name: "[optional] Sign binaries (Azure Artifact Signing, бывш. Trusted Signing)"
+        if: env.AZURE_CLIENT_ID != '' && env.AZURE_SIGNING_ACCOUNT != ''
+        uses: azure/artifact-signing-action@v2
+        with:
+          azure-tenant-id: ${{ env.AZURE_TENANT_ID }}
+          azure-client-id: ${{ env.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ env.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ env.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ env.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ env.AZURE_CERT_PROFILE }}
+          files-folder: ${{ github.workspace }}\rustdesk\rustdesk
+          files-folder-filter: exe,dll
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Build self-extracted executable
+        shell: bash
+        working-directory: rustdesk
+        run: |
+          sed -i '/dpiAware/d' res/manifest.xml
+          pushd ./libs/portable
+          pip3 install -r requirements.txt
+          python3 ./generate.py -f ../../rustdesk/ -o . -e "../../rustdesk/${APP_NAME}.exe"
+          popd
+          mkdir -p ../out
+          mv ./target/release/rustdesk-portable-packer.exe "../out/${ARTIFACT_PREFIX}-${VERSION}-x86_64.exe"
+      - uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+      - name: Build msi
+        working-directory: rustdesk/res/msi
+        run: |
+          python preprocess.py --arp -d ../../rustdesk --app-name ${{ env.APP_NAME }}
+          nuget restore msi.sln
+          msbuild msi.sln -p:Configuration=Release -p:Platform=x64 /p:TargetVersion=Windows10
+          $msi = Get-ChildItem ./Package/bin/*/Release/en-us/Package.msi | Select-Object -First 1
+          mv $msi.FullName "../../../out/${{ env.ARTIFACT_PREFIX }}-${{ env.VERSION }}-x86_64.msi"
+
+      - name: "[optional] Sign exe/msi (Azure Artifact Signing, бывш. Trusted Signing)"
+        if: env.AZURE_CLIENT_ID != '' && env.AZURE_SIGNING_ACCOUNT != ''
+        uses: azure/artifact-signing-action@v2
+        with:
+          azure-tenant-id: ${{ env.AZURE_TENANT_ID }}
+          azure-client-id: ${{ env.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ env.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ env.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ env.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ env.AZURE_CERT_PROFILE }}
+          files-folder: ${{ github.workspace }}\out
+          files-folder-filter: exe,msi
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Checksums
+        shell: bash
+        run: cd out && sha256sum -- ./* | tee SHA256SUMS-windows.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: RegWayRemote-windows-x86_64
+          path: out/*
+          if-no-files-found: error
+
+  build-macos:
+    needs: generate-bridge
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - { target: x86_64-apple-darwin, os: macos-15-intel, arch: x86_64, extra-build-args: "" }
+          - { target: aarch64-apple-darwin, os: macos-14, arch: aarch64, extra-build-args: "--screencapturekit" }
+    env:
+      MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
+      MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
+      MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+      APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          path: rustdesk
+      - name: Branding (key from secret, strict host check)
+        run: |
+          bash rustdesk/regway/scripts/apply-branding.sh rustdesk
+          bash rustdesk/regway/scripts/check-branding.sh rustdesk
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bridge-artifact
+          path: ./rustdesk
+      - name: "[optional] Import codesign certificate"
+        if: env.MACOS_P12_BASE64 != ''
+        uses: apple-actions/import-codesign-certs@253ddeeac23f2bdad1646faac5c8c2832e800071 # v1
+        with:
+          p12-file-base64: ${{ env.MACOS_P12_BASE64 }}
+          p12-password: ${{ env.MACOS_P12_PASSWORD }}
+          keychain: regway
+      - name: Install build runtime
+        run: |
+          brew install llvm create-dmg
+          command -v pkg-config >/dev/null || brew install pkg-config
+          wget -q https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip
+          unzip -q nasm-2.16.03-macosx.zip
+          sudo cp nasm-2.16.03/nasm /usr/local/bin/nasm
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Patch flutter
+        run: |
+          cd "$(dirname "$(dirname "$(which flutter)")")"
+          git apply "$GITHUB_WORKSPACE/rustdesk/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+          cd bin
+          sed -i -e 's/_setFramesEnabledState(false);/\/\/_setFramesEnabledState(false);/g' ../packages/flutter/lib/src/scheduler/binding.dart
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: ${{ env.MAC_RUST_VERSION }}
+          targets: ${{ matrix.job.target }}
+          components: "rustfmt"
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          prefix-key: ${{ matrix.job.os }}
+          workspaces: rustdesk
+      - uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+      - name: Install vcpkg dependencies
+        working-directory: rustdesk
+        run: |
+          "$VCPKG_ROOT/vcpkg" install --x-install-root="$VCPKG_ROOT/installed"
+      - name: Build
+        working-directory: rustdesk
+        run: |
+          if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
+            MIN_MACOS_VERSION="12.3"
+            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
+            sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
+            sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
+            sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
+          fi
+          ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
+          test -d "flutter/build/macos/Build/Products/Release/${APP_NAME}.app"
+
+      - name: "[optional] Codesign app (hardened runtime)"
+        if: env.MACOS_P12_BASE64 != '' && env.MACOS_CODESIGN_IDENTITY != ''
+        working-directory: rustdesk
+        run: |
+          security default-keychain -s regway.keychain
+          security unlock-keychain -p "$MACOS_P12_PASSWORD" regway.keychain
+          bash ./.github/scripts/sign-macos-app.sh \
+            "./flutter/build/macos/Build/Products/Release/${APP_NAME}.app" \
+            "$MACOS_CODESIGN_IDENTITY" \
+            ./flutter/macos/Runner/Release.entitlements
+          codesign --verify --deep --strict --verbose=2 "./flutter/build/macos/Build/Products/Release/${APP_NAME}.app"
+
+      - name: Create dmg
+        working-directory: rustdesk
+        run: |
+          CREATE_DMG="$(readlink -f "$(command -v create-dmg)")"
+          sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
+          mkdir -p ../out
+          DMG="../out/${ARTIFACT_PREFIX}-${VERSION}-${{ matrix.job.arch }}.dmg"
+          # Раскладка окна — по README Дизайнера: 660x400, иконки 128, app (165,205), Applications (495,205)
+          create-dmg --volname "RegWay Remote" \
+            --background res/regway/dmg-background.png \
+            --window-size 660 400 --icon-size 128 \
+            --icon "${APP_NAME}.app" 165 205 --hide-extension "${APP_NAME}.app" \
+            --app-drop-link 495 205 \
+            "$DMG" "./flutter/build/macos/Build/Products/Release/${APP_NAME}.app"
+
+      - name: "[optional] Sign + notarize + staple dmg"
+        if: env.MACOS_P12_BASE64 != '' && env.MACOS_CODESIGN_IDENTITY != '' && env.APPLE_API_KEY_P8_BASE64 != ''
+        run: |
+          DMG="out/${ARTIFACT_PREFIX}-${VERSION}-${{ matrix.job.arch }}.dmg"
+          codesign --force --timestamp -s "$MACOS_CODESIGN_IDENTITY" "$DMG"
+          umask 077
+          echo "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          xcrun notarytool submit "$DMG" --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --wait --timeout 60m
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          spctl -a -t open --context context:primary-signature -v "$DMG" || true
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Checksums
+        run: cd out && shasum -a 256 ./*.dmg | tee "SHA256SUMS-macos-${{ matrix.job.arch }}.txt"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: RegWayRemote-macos-${{ matrix.job.arch }}
+          path: out/*
+          if-no-files-found: error

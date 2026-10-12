@@ -52,6 +52,7 @@ fn make_tray() -> hbb_common::ResultType<()> {
 
     let (icon_rgba, icon_width, icon_height) = {
         let image = load_icon_from_asset()
+            .filter(|_| false) // RegWay: use res/ tray icons
             .unwrap_or(image::load_from_memory(icon).context("Failed to open icon path")?)
             .into_rgba8();
         let (width, height) = image.dimensions();

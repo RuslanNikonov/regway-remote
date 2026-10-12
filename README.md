@@ -1,182 +1,127 @@
-<p align="center">
-  <img src="res/logo-header.svg" alt="RustDesk - Your remote desktop"><br>
-  <a href="#raw-steps-to-build">Build</a> •
-  <a href="#how-to-build-with-docker">Docker</a> •
-  <a href="#file-structure">Structure</a> •
-  <a href="#screenshots">Screenshots</a><br>
-  [<a href="docs/README-UA.md">Українська</a>] | [<a href="docs/README-CS.md">česky</a>] | [<a href="docs/README-ZH.md">中文</a>] | [<a href="docs/README-HU.md">Magyar</a>] | [<a href="docs/README-ES.md">Español</a>] | [<a href="docs/README-FA.md">فارسی</a>] | [<a href="docs/README-FR.md">Français</a>] | [<a href="docs/README-DE.md">Deutsch</a>] | [<a href="docs/README-PL.md">Polski</a>] | [<a href="docs/README-ID.md">Indonesian</a>] | [<a href="docs/README-FI.md">Suomi</a>] | [<a href="docs/README-ML.md">മലയാളം</a>] | [<a href="docs/README-JP.md">日本語</a>] | [<a href="docs/README-NL.md">Nederlands</a>] | [<a href="docs/README-IT.md">Italiano</a>] | [<a href="docs/README-RU.md">Русский</a>] | [<a href="docs/README-PTBR.md">Português (Brasil)</a>] | [<a href="docs/README-EO.md">Esperanto</a>] | [<a href="docs/README-KR.md">한국어</a>] | [<a href="docs/README-AR.md">العربي</a>] | [<a href="docs/README-VN.md">Tiếng Việt</a>] | [<a href="docs/README-DA.md">Dansk</a>] | [<a href="docs/README-GR.md">Ελληνικά</a>] | [<a href="docs/README-TR.md">Türkçe</a>] | [<a href="docs/README-NO.md">Norsk</a>] | [<a href="docs/README-RO.md">Română</a>]<br>
-  <b>We need your help to translate this README, <a href="https://github.com/rustdesk/rustdesk/tree/master/src/lang">RustDesk UI</a> and <a href="https://github.com/rustdesk/doc.rustdesk.com">RustDesk Doc</a> to your native language</b>
-</p>
+<p align="center"><img src=".github/assets/logo.png" width="420" alt="RegWay Remote"></p>
 
-> [!Caution]
-> **Misuse Disclaimer:** <br>
-> The developers of RustDesk do not condone or support any unethical or illegal use of this software. Misuse, such as unauthorized access, control or invasion of privacy, is strictly against our guidelines. The authors are not responsible for any misuse of the application.
+# RegWay Remote — клиент (форк RustDesk)
 
 
-Chat with us: [Discord](https://discord.gg/nDceKgxnkV) | [Twitter](https://twitter.com/rustdesk) | [Reddit](https://www.reddit.com/r/rustdesk) | [YouTube](https://www.youtube.com/@rustdesk)
+Клиент удалённого доступа на базе [RustDesk](https://github.com/rustdesk/rustdesk) (AGPL-3.0), который подключается **только к нашему серверу** (hbbs/hbbr + rustdesk-api на `remote.regway.group`).
 
-[![RustDesk Server Pro](https://img.shields.io/badge/RustDesk%20Server%20Pro-Advanced%20Features-blue)](https://rustdesk.com/pricing.html)
+## Откуда взят код
 
-Yet another remote desktop solution, written in Rust. Works out of the box with no configuration required. You have full control of your data, with no concerns about security. You can use our rendezvous/relay server, [set up your own](https://rustdesk.com/server), or [write your own rendezvous/relay server](https://github.com/rustdesk/rustdesk-server-demo).
+| | |
+|---|---|
+| Upstream | https://github.com/rustdesk/rustdesk |
+| Тег | **1.5.0** (последний стабильный релиз, не prerelease; опубликован 30.09.2026) |
+| Коммит | `fada664df7a294d1d1a9ca3e7cd3637069122f17` |
+| Сабмодуль `libs/hbb_common` | `229b904508364c8997aad0fb5af57effac859f60` |
 
-![image](https://user-images.githubusercontent.com/71636191/171661982-430285f0-2e12-4b1d-9957-4a58e375304d.png)
+Зафиксировано в `UPSTREAM` и в `env.UPSTREAM_TAG` workflow. Мы **не храним** копию исходников RustDesk в репозитории: CI клонирует тег и применяет брендинг-скрипт. Это делает обновление на новый тег = смена одной строки + прогон `check-branding.sh`.
 
-RustDesk welcomes contribution from everyone. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for help getting started.
+## Структура репозитория
 
-[**FAQ**](https://github.com/rustdesk/rustdesk/wiki/FAQ)
+Корень — исходники RustDesk 1.5.0 (сабмодуль `libs/hbb_common` встроен файлами) с **уже применённым** брендингом. История: коммит импорта upstream 1.5.0 + один наш коммит, поэтому `git diff HEAD~1` показывает все наши изменения. Исходный README RustDesk — `README-RustDesk.md`. Upstream-workflows RustDesk удалены (им нужны их секреты и инфраструктура), оставлен только наш.
 
-[**BINARY DOWNLOAD**](https://github.com/rustdesk/rustdesk/releases)
-
-[**NIGHTLY BUILD**](https://github.com/rustdesk/rustdesk/releases/tag/nightly)
-
-[<img src="https://f-droid.org/badge/get-it-on.png"
-    alt="Get it on F-Droid"
-    height="80">](https://f-droid.org/en/packages/com.carriez.flutter_hbb)
-[<img src="https://flathub.org/api/badge?svg&locale=en"
-    alt="Get it on Flathub"
-    height="80">](https://flathub.org/apps/com.rustdesk.RustDesk)
-
-## Dependencies
-
-Desktop versions use Flutter or Sciter (deprecated) for GUI. This tutorial is for Sciter only, since it is easier and more friendly to start. Check out our [CI](https://github.com/rustdesk/rustdesk/blob/master/.github/workflows/flutter-build.yml) for building the Flutter version.
-
-Please download Sciter dynamic library yourself.
-
-[Windows](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.win/x64/sciter.dll) |
-[Linux](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so) |
-[macOS](https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.osx/libsciter.dylib)
-
-## Raw Steps to build
-
-- Prepare your Rust development env and C++ build env
-
-- Install [vcpkg](https://github.com/microsoft/vcpkg), and set `VCPKG_ROOT` env variable correctly
-
-  - Windows: vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
-  - Linux/macOS: vcpkg install libvpx libyuv opus aom
-
-- run `cargo run`
-
-## [Build](https://rustdesk.com/docs/en/dev/build/)
-
-## How to Build on Linux
-
-### Ubuntu 18 (Debian 10)
-
-```sh
-sudo apt install -y zip g++ gcc git curl wget nasm yasm libgtk-3-dev clang libxcb-randr0-dev libxdo-dev \
-        libxfixes-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libpulse-dev cmake make \
-        libclang-dev ninja-build libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+```
+.github/workflows/regway-build.yml  # сборка Windows/macOS
+.github/assets/                     # логотип и social preview
+regway/UPSTREAM                     # тег/коммиты upstream
+regway/branding.env                 # имя, домен, ID/Relay/API; KEY подставляется из secret
+regway/branding/design/             # иконки, трей, картинки установщиков
+regway/scripts/apply-branding.sh    # воспроизводимый брендинг (идемпотентный)
+regway/scripts/check-branding.sh    # проверки (exit 1 при нарушении)
+regway/scripts/test-branding.sh     # тесты скриптов на копиях чистого клона upstream
+regway/docs/                        # signing.md, heartbeat-revocation.md
+regway/patches/                     # итоговый diff для ревью
 ```
 
-### openSUSE Tumbleweed
+## Как применить брендинг локально
 
-```sh
-sudo zypper install gcc-c++ git curl wget nasm yasm gcc gtk3-devel clang libxcb-devel libXfixes-devel cmake alsa-lib-devel gstreamer-devel gstreamer-plugins-base-devel xdotool-devel
+```bash
+# в этом репозитории брендинг уже применён; ключ подставить так:
+# (или на чистом клоне upstream: git clone --depth 1 --branch 1.5.0 --recurse-submodules https://github.com/rustdesk/rustdesk.git rustdesk)
+# реальный ключ: содержимое data/id_ed25519.pub с VPS (передавать файлом, не в чат)
+KEY="$(cat /путь/к/id_ed25519.pub)" REQUIRE_REAL_KEY=1 regway/scripts/apply-branding.sh .
+REQUIRE_REAL_KEY=1 regway/scripts/check-branding.sh .
 ```
 
-### Fedora 28 (CentOS 8)
+Скрипт идемпотентен (повторный запуск с теми же значениями даёт тот же diff) и **падает**, если какой-то из патчей не нашёл исходную строку (значит upstream поменялся — нужно обновить скрипт, а не собирать «наполовину пропатченный» клиент). Применять к **чистому** клону: смена значений (например, example.com → реальный домен) на уже пропатченном дереве обновит не все места (ссылки UI), CI всегда клонирует заново. Переменные `branding.env` перекрываются окружением; `RS_PUB_KEY`/`RENDEZVOUS_SERVER` (как в CI RustDesk) тоже принимаются.
 
-```sh
-sudo yum -y install gcc-c++ git curl wget nasm yasm gcc gtk3-devel clang libxcb-devel libxdo-devel libXfixes-devel pulseaudio-libs-devel cmake alsa-lib-devel gstreamer1-devel gstreamer1-plugins-base-devel
-```
+### Что меняет `apply-branding.sh`
 
-### Arch (Manjaro)
+| Что | Где (реальные пути тега 1.5.0) |
+|---|---|
+| Встроенный ID-сервер | `libs/hbb_common/src/config.rs`: `RENDEZVOUS_SERVERS` (был `rs-ny.rustdesk.com`), `PROD_RENDEZVOUS_SERVER` |
+| Встроенный ключ | `config.rs`: `RS_PUB_KEY` (был ключ публичных серверов RustDesk) |
+| Запрет смены сервера | `config.rs`: `OVERWRITE_SETTINGS` = `custom-rendezvous-server`, `relay-server`, `api-server`(пусто), `key`, `allow-auto-update=N`; `BUILTIN_SETTINGS` = `hide-server-settings=Y`, `allow-deep-link-server-settings=N` |
+| Проверка обновлений | `OVERWRITE_LOCAL_SETTINGS` `enable-check-update=N`; `check_software_update()` в `src/common.rs` всегда выходит; URL `api.rustdesk.com/version/latest` в `libs/hbb_common/src/lib.rs` обнулён |
+| API (rustdesk-api lejianwen) | `OVERWRITE_SETTINGS` `api-server=$API_SERVER` (`https://remote.regway.group`). `register-device` **не** задаём (иначе `get_api_server()` вернёт `""` и отключит логин, heartbeat, sysinfo, audit). Вход в учётку доступен: вкладка «Учётная запись» зависит только от `disable-account` (HARD_SETTINGS), который мы не задаём; `hide-server-settings` скрывает только раздел ID/Relay/API/Key. Фолбэк `admin.rustdesk.com` в `get_api_server_` заменён на `http://<ID-хост>:21114`, но не достигается, т.к. API задан |
+| Heartbeat → отзыв токена | `src/hbbs_http/sync.rs`: heartbeat несёт `Authorization: Bearer <access_token>` (если токен есть в LocalConfig процесса), статус читается через `post_request_with_status`; 2 подряд **HTTP 401** при отправленном токене → закрыть все входящие сеансы (канал `disconnect`) и стереть `access_token`/`user_info`. Подробно: `docs/heartbeat-revocation.md` |
+| Windows: сервер из имени exe | `src/platform/windows.rs` `get_license_from_exe_name()` всегда `Err` → имена `…-host=X,key=Y,api=…,relay=….exe` и `…-licensed-<base64>.exe` игнорируются во всех местах (`get_custom_rendezvous_server`, `get_api_server_`, `get_key`, `get_rendezvous_server`, `bootstrap()`→`EXE_RENDEZVOUS_SERVER`, `ui_interface::get_license`). `get_license()` при установке не берёт Key/Host/Api из реестра; `core_main.rs` CLI `--config <строка>` отключён. Остальная логика имени (portable `RUSTDESK_APPNAME`, переименование в `<APP_NAME>.exe` при установке) не тронута |
+| Текст разрыва сеанса | `src/lang/ru.rs`: «Closed manually by web console» → «Сеанс завершён администратором» (видит управляющая сторона при `disconnect` от API или отзыве токена) |
+| Иконки трея | `res/tray-icon.ico` (Windows/Linux, `include_bytes!` в `src/tray.rs`), `res/mac-tray-dark-x2.png` (macOS, template), `res/mac-tray-light-x2.png` (кодом 1.5.0 не используется). `src/tray.rs`: отключена подмена на `flutter_assets/assets/icon.png`, иначе в трее был бы цветной логотип окна |
+| Ссылки UI (сайт, pricing/донат, download, privacy, docs) | `flutter/lib/**` (7 файлов), `src/ui/*.tis`, `src/client.rs`, `src/lang/en.rs`, `LINK_DOCS_*` → `WEBSITE_URL` |
+| Имя приложения (runtime) | `config.rs`: `APP_NAME` = `RegWayRemote` (каталоги конфигурации, имя `.exe` при установке, служба, launchd, схема `regwayremote://`); `ORG` (macOS) |
+| Windows метаданные | `Cargo.toml [package.metadata.winres]`, `flutter/windows/runner/Runner.rc`, `flutter/windows/runner/main.cpp` |
+| macOS метаданные | `flutter/macos/Runner/Configs/AppInfo.xcconfig` (`PRODUCT_NAME` → `RegWayRemote.app`, bundle id), `flutter/macos/Runner/Info.plist` (URL scheme, `CFBundleDisplayName`), `build.py` (путь к `.app`), `Cargo.toml [package.metadata.bundle]` |
+| MSI | имя через `res/msi/preprocess.py --app-name RegWayRemote` (в CI) |
+| Иконки | `res/icon.ico`, `res/tray-icon.ico`, `res/icon.png`, `res/mac-icon.png`, `res/32x32.png`, `64x64`, `128x128`, `128x128@2x`, `flutter/windows/runner/resources/app_icon.ico`, `flutter/macos/Runner/AppIcon.icns`, `flutter/assets/icon.png` (логотип в окне и трей) |
+| Картинки установщиков | `res/msi/Package/Resources/WixUIBannerBmp.bmp`, `WixUIDialogBmp.bmp` (preprocess.py подхватывает сам); `res/regway/dmg-background.png` → `create-dmg --background` в CI |
 
-```sh
-sudo pacman -Syu --needed unzip git cmake gcc curl wget yasm nasm zip make pkg-config clang gtk3 xdotool libxcb libxfixes alsa-lib pipewire
-```
+Не применяется: **NSIS-картинки** — в RustDesk 1.5.0 нет NSIS-инсталлятора (Windows `.exe` = самораспаковывающийся `libs/portable` + встроенный установщик приложения, `.msi` = WiX v4). Файлы `nsis-*.bmp` лежат в `branding/design/` на случай, если появится свой NSIS. Иконки трея — из `design/tray/` (см. таблицу).
 
-### Install vcpkg
+### Почему пользователь не может сменить сервер
 
-```sh
-git clone https://github.com/microsoft/vcpkg
-cd vcpkg
-git checkout 2023.04.15
-cd ..
-vcpkg/bootstrap-vcpkg.sh
-export VCPKG_ROOT=$HOME/vcpkg
-vcpkg/vcpkg install libvpx libyuv opus aom
-```
+`Config::get_option()` читает `OVERWRITE_SETTINGS` раньше пользовательского `RustDesk2.toml` (`get_or(OVERWRITE, user, DEFAULT)`), а UI (`ui_interface.rs`) не даёт сохранять ключи, присутствующие в `OVERWRITE_SETTINGS`. Это тот же механизм, что у официального «custom client» RustDesk Pro (`custom.txt` → `override-settings`), только вкомпилирован. Плюс раздел «ID/Relay сервер» скрыт (`hide-server-settings`) и deep-link не может подменить сервер. Переопределение через имя exe (`-host=…,key=…`, `-licensed-…`), реестр (миграция ≤1.2.1) и CLI `--config` отключено патчем (см. таблицу).
 
-### Fix libvpx (For Fedora)
+### Проверка «нет серверов RustDesk»
 
-```sh
-cd vcpkg/buildtrees/libvpx/src
-cd *
-./configure
-sed -i 's/CFLAGS+=-I/CFLAGS+=-fPIC -I/g' Makefile
-sed -i 's/CXXFLAGS+=-I/CXXFLAGS+=-fPIC -I/g' Makefile
-make
-cp libvpx.a $HOME/vcpkg/installed/x64-linux/lib/
-cd
-```
+`regway/scripts/check-branding.sh` ищет `rustdesk.com|rs-ny|rs-sg|rs-cn` в `src`, `libs/hbb_common/src`, `flutter/lib`. Допустимые остатки (allowlist):
+* `src/common.rs:1031` — комментарий;
+* `src/common.rs:1175` — `is_public()`: **детектор** «это публичный сервер RustDesk?», сам никуда не подключается;
+* `src/common.rs:3xxx`, `libs/hbb_common/src/websocket.rs:48x–52x`, `socket_client.rs:31x–32x` — `#[cfg(test)]` юнит-тесты.
 
-### Build
+Вне этих каталогов (`res/`, `flatpak/`, `fastlane/`, `Cargo.toml` deps `rustdesk-org/*` на GitHub, драйверы `github.com/rustdesk/...` в CI) — метаданные пакетов и источники зависимостей сборки, не код подключения.
 
-```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
-git clone --recurse-submodules https://github.com/rustdesk/rustdesk
-cd rustdesk
-mkdir -p target/debug
-wget https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so
-mv libsciter-gtk.so target/debug
-VCPKG_ROOT=$HOME/vcpkg cargo run
-```
+## CI: `.github/workflows/regway-build.yml`
 
-## How to build with Docker
+Основан на официальном `flutter-build.yml` тега 1.5.0 (те же Flutter 3.24.5 + кастомный engine RustDesk для Windows, Rust 1.75/1.81, vcpkg `9e593bb…`, flutter_rust_bridge 1.80.1). Workflow делает checkout этого репозитория в `./rustdesk` и повторно запускает `regway/scripts/apply-branding.sh`, чтобы подставить ключ из secret.
 
-Begin by cloning the repository and building the Docker container:
+Запуск: вручную (`workflow_dispatch`) или пушем тега `v*`. Джобы: `generate-bridge` → `build-windows-x64` (windows-2022) + `build-macos` (macos-15-intel x86_64, macos-14 arm64). Результат — artifacts джоб (релиз на GitHub не публикуется; добавить `softprops/action-gh-release`, когда решим, где раздаём).
 
-```sh
-git clone https://github.com/rustdesk/rustdesk
-cd rustdesk
-git submodule update --init --recursive
-docker build -t "rustdesk-builder" .
-```
+### Артефакты (VERSION = версия upstream, 1.5.0)
 
-Then, each time you need to build the application, run the following command:
+| Платформа | Файл |
+|---|---|
+| Windows x64, установщик/портативный | `RegWayRemote-1.5.0-x86_64.exe` |
+| Windows x64, MSI | `RegWayRemote-1.5.0-x86_64.msi` |
+| macOS Intel | `RegWayRemote-1.5.0-x86_64.dmg` |
+| macOS Apple Silicon | `RegWayRemote-1.5.0-aarch64.dmg` |
+| + `SHA256SUMS-windows.txt`, `SHA256SUMS-macos-<arch>.txt` | |
 
-```sh
-docker run --rm -it -v $PWD:/home/user/rustdesk -v rustdesk-git-cache:/home/user/.cargo/git -v rustdesk-registry-cache:/home/user/.cargo/registry -e PUID="$(id -u)" -e PGID="$(id -g)" rustdesk-builder
-```
+Имена artifacts в Actions: `RegWayRemote-windows-x86_64`, `RegWayRemote-macos-x86_64`, `RegWayRemote-macos-aarch64`.
 
-Note that the first build may take longer before dependencies are cached, subsequent builds will be faster. Additionally, if you need to specify different arguments to the build command, you may do so at the end of the command in the `<OPTIONAL-ARGS>` position. For instance, if you wanted to build an optimized release version, you would run the command above followed by `--release`. The resulting executable will be available in the target folder on your system, and can be run with:
+### Secrets
 
-```sh
-target/debug/rustdesk
-```
+| Secret | Обязателен | Назначение |
+|---|---|---|
+| `RS_PUB_KEY` | да для релиза (`REQUIRE_REAL_KEY=1` при push тега и по умолчанию в dispatch) | содержимое `data/id_ed25519.pub` |
 
-Or, if you're running a release executable:
+При `REQUIRE_REAL_KEY=1` `apply-branding.sh` падает, если: KEY не 44-символьный base64 ed25519; хосты не **ровно** `remote.regway.group` (ID), `remote.regway.group:21117` (relay), `https://remote.regway.group` (API) — хост зашит в скрипте (`REGWAY_HOST`), а не берётся из окружения; `WEBSITE_URL`/`DOMAIN` содержат example.*. `check-branding.sh` при `REQUIRE_REAL_KEY=1` дополнительно проверяет эти значения в `config.rs` и что ключ не плейсхолдер-строка. Тесты: `scripts/test-branding.sh` (15 случаев). `WEBSITE_URL` проверяется тоже: ссылки «Сайт/Скачать/Конфиденциальность» на example.com в релизе — дефект. Домен прописан: `remote.regway.group` (ID), `remote.regway.group:21117` (relay), `https://remote.regway.group` (API и WEBSITE_URL).
+| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`, `AZURE_CERT_PROFILE` | нет | подпись Windows через Azure Artifact Signing (бывш. Trusted Signing). Без них шаги пропускаются |
+| `MACOS_P12_BASE64`, `MACOS_P12_PASSWORD`, `MACOS_CODESIGN_IDENTITY` | нет | Developer ID Application (.p12) для `codesign` |
+| `APPLE_API_KEY_P8_BASE64`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID` | нет | App Store Connect API key для `notarytool` |
 
-```sh
-target/release/rustdesk
-```
+Без secrets сборка проходит и даёт **неподписанные** файлы. Как добавить: Settings → Secrets and variables → Actions, или `gh secret set RS_PUB_KEY < id_ed25519.pub`. Локально секреты держим только в файлах с `chmod 600` (каталог `secrets/` в `.gitignore`).
 
-Please ensure that you run these commands from the root of the RustDesk repository, or the application may not find the required resources. Also note that other cargo subcommands such as `install` or `run` are not currently supported via this method as they would install or run the program inside the container instead of the host.
+Отличия от upstream-workflow: убраны Windows arm64, sciter, Linux/Android/iOS, SBOM, их сервис подписи `SIGN_BASE_URL`, публикация в их релиз `nightly`, сборка `RustDeskTempTopMostWindow` (нужна только для «режима конфиденциальности» в варианте с внедрением в процесс; без неё сборка проходит, privacy mode 2 по-прежнему работает через виртуальный дисплей — проверить на QA). Нотаризация — `xcrun notarytool` вместо `rcodesign`.
 
-## File Structure
+## Лицензия AGPL-3.0 — что обязательно
 
-- **[libs/hbb_common](https://github.com/rustdesk/rustdesk/tree/master/libs/hbb_common)**: video codec, config, tcp/udp wrapper, and some other utility functions shared with the server
-- **[libs/base](https://github.com/rustdesk/rustdesk/tree/master/libs/base)**: protobuf, fs functions for file transfer, keyboard and platform code used only by this app
-- **[libs/scrap](https://github.com/rustdesk/rustdesk/tree/master/libs/scrap)**: screen capture
-- **[libs/enigo](https://github.com/rustdesk/rustdesk/tree/master/libs/enigo)**: platform specific keyboard/mouse control
-- **[libs/clipboard](https://github.com/rustdesk/rustdesk/tree/master/libs/clipboard)**: file copy and paste implementation for Windows, Linux, macOS.
-- **[src/ui](https://github.com/rustdesk/rustdesk/tree/master/src/ui)**: obsolete Sciter UI (deprecated)
-- **[src/server](https://github.com/rustdesk/rustdesk/tree/master/src/server)**: audio/clipboard/input/video services, and network connections
-- **[src/client.rs](https://github.com/rustdesk/rustdesk/tree/master/src/client.rs)**: start a peer connection
-- **[src/rendezvous_mediator.rs](https://github.com/rustdesk/rustdesk/tree/master/src/rendezvous_mediator.rs)**: Communicate with [rustdesk-server](https://github.com/rustdesk/rustdesk-server), wait for remote direct (TCP hole punching) or relayed connection
-- **[src/platform](https://github.com/rustdesk/rustdesk/tree/master/src/platform)**: platform specific code
-- **[flutter](https://github.com/rustdesk/rustdesk/tree/master/flutter)**: Flutter code for desktop and mobile
+RustDesk распространяется под **GNU AGPL-3.0** (`rustdesk/LICENCE`). Наш клиент — производная работа, поэтому:
 
-## Screenshots
+1. **Публикуем исходники нашей версии** (форк + `apply-branding.sh` + workflow) под AGPL-3.0 и даём ссылку на них всем, кто получает бинарники (страница загрузки, «О программе»). AGPL §13 дополнительно требует предлагать исходники пользователям, взаимодействующим с программой по сети, — для клиента и для нашего hbbs/hbbr (тоже AGPL) держим публичный репозиторий.
+2. **Сохраняем лицензию и копирайты**: файл `LICENCE`, заголовки, `Copyright © Purslane Tech Pte. Ltd.` в метаданных заменены на «Based on RustDesk … AGPL-3.0; modifications (c) RegWay» — оригинальное авторство упомянуто.
+3. **Указываем RustDesk** как основу (README, «О программе», сайт) и отмечаем, что файлы изменены (AGPL §5a — «prominent notices», это делают патчи скрипта и этот README).
+4. Не добавляем ограничений сверх AGPL; не вшиваем проприетарных компонентов, которые нельзя распространять под AGPL.
+5. Товарный знак «RustDesk» и их логотип не используем как своё название — поэтому и брендинг.
 
-![Connection Manager](https://github.com/rustdesk/rustdesk/assets/28412477/db82d4e7-c4bc-4823-8e6f-6af7eadf7651)
-
-![Connected to a Windows PC](https://github.com/rustdesk/rustdesk/assets/28412477/9baa91e9-3362-4d06-aa1a-7518edcbd7ea)
-
-![File Transfer](https://github.com/rustdesk/rustdesk/assets/28412477/39511ad3-aa9a-4f8c-8947-1cce286a46ad)
-
-![TCP Tunneling](https://github.com/rustdesk/rustdesk/assets/28412477/78e8708f-e87e-4570-8373-1360033ea6c5)
-
+Ключ сервера (`RS_PUB_KEY`) — публичный, его наличие в исходниках не секрет. Приватный `id_ed25519` в репозиторий не попадает никогда.
