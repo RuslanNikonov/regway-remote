@@ -24,6 +24,9 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../common/widgets/dialog.dart';
 import '../../common/widgets/login.dart';
+import 'package:flutter_hbb/regway/nav.dart';
+import 'package:flutter_hbb/regway/theme.dart';
+import 'package:flutter_hbb/regway/widgets.dart';
 
 const double _kTabWidth = 200;
 const double _kTabHeight = 42;
@@ -60,6 +63,7 @@ enum SettingsTabKey {
 
 class DesktopSettingPage extends StatefulWidget {
   final SettingsTabKey initialTabkey;
+  static SettingsTabKey? pendingTab;
   static final List<SettingsTabKey> tabKeys = [
     if (bind.mainGetBuildinOption(key: kOptionHideGeneralSetting) != 'Y')
       SettingsTabKey.general,
@@ -92,9 +96,15 @@ class DesktopSettingPage extends StatefulWidget {
       if (index == -1) {
         return;
       }
+      pendingTab = page;
+      if (!bind.isIncomingOnly()) {
+        RwNav.go(RwNavId.settings);
+      }
       if (Get.isRegistered<PageController>(tag: _kSettingPageControllerTag) &&
           Get.isRegistered<Rx<SettingsTabKey>>(tag: _kSettingPageTabKeyTag)) {
-        DesktopTabPage.onAddSetting(initialPage: page);
+        if (bind.isIncomingOnly()) {
+          DesktopTabPage.onAddSetting(initialPage: page);
+        }
         PageController controller =
             Get.find<PageController>(tag: _kSettingPageControllerTag);
         Rx<SettingsTabKey> selected =
@@ -126,7 +136,8 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   Timer? _videoConnTimer;
 
   _DesktopSettingPageState(SettingsTabKey initialTabkey) {
-    var initialIndex = DesktopSettingPage.tabKeys.indexOf(initialTabkey);
+    var initialIndex = DesktopSettingPage.tabKeys
+        .indexOf(DesktopSettingPage.pendingTab ?? initialTabkey);
     if (initialIndex == -1) {
       initialIndex = 0;
     }
@@ -274,70 +285,107 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Colors.transparent,
       body: _buildBlock(
         children: <Widget>[
-          SizedBox(
-            width: _kTabWidth,
-            child: Column(
-              children: [
-                _header(context),
-                Flexible(child: _listView(tabs: _settingTabs())),
-              ],
-            ),
-          ),
-          const VerticalDivider(width: 1),
           Expanded(
-            child: Container(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: PageView(
-                controller: controller,
-                physics: NeverScrollableScrollPhysics(),
-                children: _children(),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _header(context),
+                  _horizontalTabs(_settingTabs()),
+                  Expanded(
+                    child: PageView(
+                      controller: controller,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: _children(),
+                    ),
+                  ),
+                  _footer(context),
+                ],
               ),
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
   Widget _header(BuildContext context) {
-    final settingsText = Text(
-      translate('Settings'),
-      textAlign: TextAlign.left,
-      style: const TextStyle(
-        color: _accentColor,
-        fontSize: _kTitleFontSize,
-        fontWeight: FontWeight.w400,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(translate('Settings'), style: RwText.h1),
+          const SizedBox(height: 6),
+          Text(translate('Parameters of this computer'), style: RwText.muted),
+        ],
       ),
     );
-    return Row(
-      children: [
-        if (isWeb)
-          IconButton(
-            onPressed: () {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-            },
-            icon: Icon(Icons.arrow_back),
-          ).marginOnly(left: 5),
-        if (isWeb)
-          SizedBox(
-            height: 62,
-            child: Align(
-              alignment: Alignment.center,
-              child: settingsText,
-            ),
-          ).marginOnly(left: 20),
-        if (!isWeb)
-          SizedBox(
-            height: 62,
-            child: settingsText,
-          ).marginOnly(left: 20, top: 10),
-        const Spacer(),
-      ],
+  }
+
+  Widget _horizontalTabs(List<_TabInfo> tabs) {
+    return Obx(() {
+      return Container(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: RwColors.border)),
+        ),
+        child: Row(
+          children: tabs.map((tab) {
+            final selected = tab.key == selectedTab.value;
+            return InkWell(
+              onTap: () {
+                final index = DesktopSettingPage.tabKeys.indexOf(tab.key);
+                if (index == -1) return;
+                controller.jumpToPage(index);
+                selectedTab.value = tab.key;
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      width: 2,
+                      color: selected ? RwColors.accent : Colors.transparent,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  translate(tab.label),
+                  style: RwText.bodyStrong.copyWith(
+                    color: selected ? RwColors.text : RwColors.muted,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      );
+    });
+  }
+
+  Widget _footer(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          RwButton(
+            label: translate('Cancel'),
+            ghost: true,
+            onPressed: () => RwNav.go(RwNavId.computers),
+          ),
+          const SizedBox(width: 10),
+          RwButton(
+            label: translate('Save'),
+            onPressed: () => RwNav.go(RwNavId.computers),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2532,7 +2580,7 @@ class _AboutState extends State<_About> {
       final scrollController = ScrollController();
       return SingleChildScrollView(
         controller: scrollController,
-        child: _Card(title: translate('About RustDesk'), children: [
+        child: _Card(title: 'About RustDesk', children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2580,7 +2628,7 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\n$license',
+                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\nbased on RustDesk (AGPL-3.0)\n$license',
                             style: const TextStyle(color: Colors.white),
                           ),
                           Text(
@@ -2615,29 +2663,34 @@ Widget _Card(
   return Row(
     children: [
       Flexible(
-        child: SizedBox(
+        child: Container(
           width: _kCardFixedWidth,
-          child: Card(
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                        child: Text(
-                      translate(title),
-                      textAlign: TextAlign.start,
-                      style: const TextStyle(
-                        fontSize: _kTitleFontSize,
-                      ),
-                    )),
-                    ...?title_suffix
-                  ],
-                ).marginOnly(left: _kContentHMargin, top: 10, bottom: 10),
-                ...children
-                    .map((e) => e.marginOnly(top: 4, right: _kContentHMargin)),
-              ],
-            ).marginOnly(bottom: 10),
-          ).marginOnly(left: _kCardLeftMargin, top: 15),
+          margin: const EdgeInsets.only(left: _kCardLeftMargin, top: 15),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+          decoration: RwDecor.panel,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                      child: Text(
+                    translate(title),
+                    textAlign: TextAlign.start,
+                    style: RwText.h2,
+                  )),
+                  ...?title_suffix
+                ],
+              ).marginOnly(bottom: 6),
+              ...children.map((e) => Container(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    decoration: const BoxDecoration(
+                      border: Border(top: BorderSide(color: RwColors.border)),
+                    ),
+                    child: e,
+                  )),
+            ],
+          ),
         ),
       ),
     ],

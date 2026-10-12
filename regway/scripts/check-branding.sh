@@ -65,8 +65,17 @@ need src/login_gate.rs 'fn http_401_unauthorized_revokes' "login-gate: unit test
 need src/login_gate.rs 'fn network_error_uses_grace_not_revoke' "login-gate: unit test network error → grace"
 need src/server.rs 'crate::login_gate::refuse_incoming()' "login-gate: incoming refused without token"
 need src/client.rs 'crate::login_gate::refuse_outgoing()' "login-gate: outgoing refused without token"
-need flutter/lib/common/widgets/login.dart 'class LoginGatePage extends StatefulWidget' "login-gate: full-window Flutter gate"
+need flutter/lib/regway/login_view.dart 'class RwLoginPage extends StatelessWidget' "login-gate: full-window Flutter gate"
+need flutter/lib/regway/widgets.dart 'bg = hover && enabled ? const Color(0xFFFF5A75) : RwColors.danger' "redesign: solid danger disconnect"
+need flutter/lib/regway/theme.dart 'static const Color accent = Color(0xFF38D9FF);' "redesign: solid accent #38d9ff"
 need src/lang/ru.rs '("UserDisabled", "Аккаунт отключён администратором"),' "login-gate: UserDisabled ru"
+need src/lang/en.rs '("UserDisabled", "Account disabled by administrator"),' "login-gate: UserDisabled en"
+need flutter/lib/common.dart "if (name == 'RegWayRemote') return 'RegWay Remote';" "window title uses display name"
+need src/tray.rs '"RegWay Remote".to_owned()' "tray tooltip uses display name"
+need flutter/macos/Runner/Info.plist "<string>RegWay Remote</string>" "macOS CFBundleDisplayName"
+need flutter/ios/Runner/Info.plist "<string>RegWay Remote</string>" "iOS CFBundleDisplayName"
+need res/rustdesk.desktop "Name=RegWay Remote" "desktop Name="
+need res/msi/Package/Language/Package.en-us.wxl 'Value="RegWay Remote"' "MSI product strings"
 need libs/hbb_common/src/config.rs '("hide-server-settings".to_owned(), "Y".to_owned())' "раздел сервера скрыт"
 rg -q '"relay-server"\.to_owned\(\), "[A-Za-z0-9.-]+:21117"' libs/hbb_common/src/config.rs \
   && echo "OK   relay = <хост>:21117" || { echo "FAIL relay не <хост>:21117"; fail=1; }
@@ -98,6 +107,93 @@ if hitshttp="$(rg -n -F 'http://remote.regway.group' src libs flutter/lib || tru
 else
   echo "OK   http://remote.regway.group нет в src/ libs/ flutter/lib/"
 fi
+# User-visible "RustDesk" in UI strings. Allowed: AGPL attribution
+# ("based on RustDesk (AGPL-3.0)" / "Based on RustDesk") and lookup keys.
+echo "== видимый RustDesk в UI"
+python3 - "$RD" <<'PY' || fail=1
+import re, sys
+from pathlib import Path
+root = Path(sys.argv[1] if len(sys.argv) > 1 else ".")
+allowed_val = re.compile(
+    r"based on RustDesk \(AGPL-3\.0\)|Based on RustDesk",
+    re.I,
+)
+fail = 0
+lang_line = re.compile(r'^\s*\("([^"]*)", "(.*)"\),?\s*$')
+for p in sorted((root / "src/lang").glob("*.rs")):
+    for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+        m = lang_line.match(line)
+        if not m:
+            continue
+        val = m.group(2)
+        if "RustDesk" not in val and "Rustdesk" not in val:
+            continue
+        stripped = allowed_val.sub("", val)
+        if re.search(r"RustDesk|Rustdesk", stripped):
+            print(f"FAIL visible RustDesk {p.relative_to(root)}:{i}: {val[:120]}")
+            fail = 1
+# Flutter UI literals (skip comments, debug, keys passed to translate, AGPL).
+ui_dirs = [
+    root / "flutter/lib",
+    root / "res/msi/Package/Language",
+]
+skip_re = re.compile(
+    r"debugPrint|RustDeskTerminal|translate\(|About RustDesk|Keep RustDesk|Show RustDesk|"
+    r"based on RustDesk|Based on RustDesk|is_custom_client|mainGetAppNameSync|"
+    r"com\.rustdesk|com\.carriez|//",
+    re.I,
+)
+lit = re.compile(r'''(['"])(.*?)(\1)''')
+xml_string = re.compile(r"<string>([^<]*)</string>", re.I)
+desktop_name = re.compile(r"^(Name|GenericName|Comment|Value)=(.*)$")
+extra_files = [
+    root / "flutter/macos/Runner/Info.plist",
+    root / "flutter/ios/Runner/Info.plist",
+    root / "flutter/android/app/src/main/res/values/strings.xml",
+    root / "flutter/android/app/src/main/AndroidManifest.xml",
+    root / "res/rustdesk.desktop",
+    root / "res/rustdesk-link.desktop",
+]
+def report_visible(path, lineno, text):
+    global fail
+    stripped = allowed_val.sub("", text)
+    if re.search(r"RustDesk|Rustdesk", stripped):
+        print(f"FAIL visible RustDesk {path.relative_to(root)}:{lineno}: {text[:120]}")
+        fail = 1
+for d in ui_dirs:
+    if not d.exists():
+        continue
+    for p in d.rglob("*"):
+        if p.suffix.lower() not in {".dart", ".wxl"}:
+            continue
+        for i, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            if skip_re.search(line):
+                continue
+            for m in lit.finditer(line):
+                s = m.group(2)
+                if "RustDesk" in s or "Rustdesk" in s:
+                    report_visible(p, i, s)
+for p in extra_files:
+    if not p.exists():
+        continue
+    for i, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        if "<!--" in line or skip_re.search(line):
+            continue
+        for m in xml_string.finditer(line):
+            if "RustDesk" in m.group(1) or "Rustdesk" in m.group(1):
+                report_visible(p, i, m.group(1))
+        m = desktop_name.match(line.strip())
+        if m and ("RustDesk" in m.group(2) or "Rustdesk" in m.group(2)):
+            report_visible(p, i, m.group(2))
+        for m in lit.finditer(line):
+            s = m.group(2)
+            if "RustDesk" in s or "Rustdesk" in s:
+                report_visible(p, i, s)
+if fail:
+    sys.exit(1)
+print("OK   нет пользовательского RustDesk вне AGPL attribution")
+PY
+
 # Строгий режим (CI релиза): хосты ровно remote.regway.group
 if [ "${REQUIRE_REAL_KEY:-0}" = 1 ]; then
   H=remote.regway.group

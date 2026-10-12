@@ -82,16 +82,22 @@ fn make_tray() -> hbb_common::ResultType<()> {
         tray_menu.append_items(&[&open_i]).ok();
     }
     let tooltip = |count: usize| {
+        let name = crate::get_app_name();
+        let name = if name == "RegWayRemote" {
+            "RegWay Remote".to_owned()
+        } else {
+            name
+        };
         if count == 0 {
             format!(
                 "{} {}",
-                crate::get_app_name(),
+                name,
                 translate("Service is running".to_owned()),
             )
         } else {
             format!(
                 "{} - {}\n{}",
-                crate::get_app_name(),
+                name,
                 translate("Ready".to_owned()),
                 translate("{".to_string() + &format!("{count}") + "} sessions"),
             )

@@ -15,7 +15,7 @@ on:
         default: true
   push:
     tags: ["v*"]
-    branches: ["main", "feat/login-gate"]
+    branches: ["main", "feat/login-gate", "regway/next"]
 
 permissions:
   contents: read

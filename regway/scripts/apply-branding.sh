@@ -290,6 +290,10 @@ if "CFBundleDisplayName" not in (RD / pl).read_text():
 # build.py (mac): путь к .app зависит от PRODUCT_NAME
 sub("build.py", "Release/RustDesk.app", f"Release/{APP}.app")
 sub("build.py", '--volname \\"RustDesk Installer\\"', f'--volname \\"{DISP}\\"', required=False)
+wxl = "res/msi/Package/Language/Package.en-us.wxl"
+if (RD / wxl).exists():
+    raw = (RD / wxl).read_text(encoding="utf-8")
+    (RD / wxl).write_text(raw.replace("RustDesk", DISP), encoding="utf-8")
 
 if errors:
     print("ОШИБКИ брендинга (upstream изменился?):", *errors, sep="\n  ", file=sys.stderr)

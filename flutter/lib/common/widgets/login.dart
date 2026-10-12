@@ -150,7 +150,7 @@ class ConfigOP {
   ConfigOP({required this.op, required this.icon});
 }
 
-class _OidcAuthController {
+class OidcAuthController {
   final RxString curOP = ''.obs;
   Future<void> _pendingOperation = Future<void>.value();
   int _authAttempt = 0;
@@ -654,11 +654,11 @@ class LoginWidgetUserPass extends StatelessWidget {
     return Padding(
         padding: EdgeInsets.all(0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 8.0),
             DialogTextField(
-                title: translate(DialogTextField.kUsernameTitle),
+                title: translate('Email or login'),
                 controller: username,
                 focusNode: userFocusNode,
                 prefixIcon: DialogTextField.kUsernameIcon,
@@ -669,28 +669,27 @@ class LoginWidgetUserPass extends StatelessWidget {
               reRequestFocus: true,
               errorText: passMsg,
             ),
-            // NOT use Offstage to wrap LinearProgressIndicator
-            if (isInProgress) const LinearProgressIndicator(),
-            const SizedBox(height: 12.0),
-            FittedBox(
-                child:
-                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Container(
-                height: 38,
-                width: 200,
-                child: Obx(() => ElevatedButton(
-                      child: Text(
-                        translate('Login'),
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      onPressed: curOP.value.isEmpty && !isInProgress
-                          ? () {
-                              onLogin();
-                            }
-                          : null,
-                    )),
+            if (isInProgress)
+              const LinearProgressIndicator(
+                color: Color(0xFF38D9FF),
+                backgroundColor: Color(0x40A7ABC9),
               ),
-            ])),
+            const SizedBox(height: 12.0),
+            SizedBox(
+              height: 42,
+              child: Obx(() => ElevatedButton(
+                    child: Text(
+                      translate('Login'),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    onPressed: curOP.value.isEmpty && !isInProgress
+                        ? () {
+                            onLogin();
+                          }
+                        : null,
+                  )),
+            ),
           ],
         ));
   }
@@ -729,7 +728,7 @@ Future<bool?> _openLoginDialog() async {
   String? usernameMsg;
   String? passwordMsg;
   var isInProgress = false;
-  final oidcAuth = _OidcAuthController();
+  final oidcAuth = OidcAuthController();
   final curOP = oidcAuth.curOP;
   // Track hover state for the close icon
   bool isCloseHovered = false;
@@ -937,7 +936,12 @@ Future<bool?> _openLoginDialog() async {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          translate('Login'),
+          bind.mainGetAppNameSync(),
+          style: const TextStyle(
+            fontFamily: 'Unbounded',
+            fontWeight: FontWeight.w600,
+            fontSize: 22,
+          ),
         ).marginOnly(top: MyTheme.dialogPadding),
         MouseRegion(
           onEnter: (_) => setState(() => isCloseHovered = true),
@@ -1109,227 +1113,6 @@ Future<bool?> verificationCodeDialog(
   }
 
   return res;
-}
-
-/// Full-window login that cannot be dismissed. Shown until `/api/login`
-/// succeeds. OIDC buttons appear only when the API reports them.
-class LoginGatePage extends StatefulWidget {
-  const LoginGatePage({Key? key}) : super(key: key);
-
-  @override
-  State<LoginGatePage> createState() => _LoginGatePageState();
-}
-
-class _LoginGatePageState extends State<LoginGatePage> {
-  late final TextEditingController username;
-  late final TextEditingController password;
-  final userFocusNode = FocusNode();
-  final oidcAuth = _OidcAuthController();
-  String? usernameMsg;
-  String? passwordMsg;
-  var isInProgress = false;
-  final loginOptions = [].obs;
-  final loginOptionsError = Rxn<Object>();
-  final loginOptionsInProgress = false.obs;
-
-  @override
-  void initState() {
-    super.initState();
-    username = TextEditingController(
-        text: UserModel.getLocalUserInfo()?['name'] ?? '');
-    password = TextEditingController();
-    username.addListener(() {
-      if (usernameMsg != null) setState(() => usernameMsg = null);
-    });
-    password.addListener(() {
-      if (passwordMsg != null) setState(() => passwordMsg = null);
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      userFocusNode.requestFocus();
-      _fetchLoginOptions();
-    });
-  }
-
-  @override
-  void dispose() {
-    oidcAuth.close();
-    username.dispose();
-    password.dispose();
-    userFocusNode.dispose();
-    super.dispose();
-  }
-
-  Future<void> _fetchLoginOptions() async {
-    loginOptionsInProgress.value = true;
-    try {
-      loginOptions.value = await UserModel.queryOidcLoginOptions();
-      loginOptionsError.value = null;
-    } catch (e) {
-      debugPrint("queryOidcLoginOptions failed: $e");
-      loginOptionsError.value = e;
-    } finally {
-      loginOptionsInProgress.value = false;
-    }
-  }
-
-  Future<void> _handleLoginResponse(LoginResponse resp) async {
-    switch (resp.type) {
-      case HttpType.kAuthResTypeToken:
-        if (resp.access_token != null) {
-          await bind.mainSetLocalOption(
-              key: 'access_token', value: resp.access_token!);
-          await bind.mainSetLocalOption(
-              key: 'user_info', value: jsonEncode(resp.user ?? {}));
-          await UserModel.updateOtherModels();
-          return;
-        }
-        break;
-      case HttpType.kAuthResTypeEmailCheck:
-        bool? isEmailVerification;
-        if (resp.tfa_type == null ||
-            resp.tfa_type == HttpType.kAuthResTypeEmailCheck) {
-          isEmailVerification = true;
-        } else if (resp.tfa_type == HttpType.kAuthResTypeTfaCheck) {
-          isEmailVerification = false;
-        } else {
-          passwordMsg = "Failed, bad tfa type from server";
-        }
-        if (isEmailVerification != null) {
-          setState(() => isInProgress = false);
-          final res = await verificationCodeDialog(
-              resp.user, resp.secret, isEmailVerification);
-          if (res == true) {
-            await UserModel.updateOtherModels();
-          }
-        }
-        break;
-      default:
-        passwordMsg = "Failed, bad response from server";
-        break;
-    }
-  }
-
-  Future<void> _onLogin() async {
-    if (oidcAuth.curOP.value.isNotEmpty || isInProgress) return;
-    if (username.text.isEmpty) {
-      setState(() => usernameMsg = translate('Username missed'));
-      return;
-    }
-    if (password.text.isEmpty) {
-      setState(() => passwordMsg = translate('Password missed'));
-      return;
-    }
-    oidcAuth.curOP.value = 'rustdesk';
-    setState(() => isInProgress = true);
-    try {
-      final resp = await gFFI.userModel.login(LoginRequest(
-          username: username.text,
-          password: password.text,
-          id: await bind.mainGetMyId(),
-          uuid: await bind.mainGetUuid(),
-          autoLogin: true,
-          type: HttpType.kAuthReqTypeAccount));
-      await _handleLoginResponse(resp);
-    } on RequestException catch (err) {
-      // Disabled account: POST /api/login → 400 {"error":"UserDisabled"}.
-      passwordMsg = translate(err.cause.isEmpty ? 'Login Error' : err.cause);
-    } catch (err) {
-      passwordMsg = "Unknown Error: $err";
-    }
-    oidcAuth.curOP.value = '';
-    if (mounted) setState(() => isInProgress = false);
-  }
-
-  Widget _thirdAuthWidget() {
-    return Obx(() {
-      final error = loginOptionsError.value;
-      final inProgress = loginOptionsInProgress.value;
-      if (error != null) {
-        return Column(
-          children: [
-            const SizedBox(height: 8.0),
-            if (inProgress) const LinearProgressIndicator(),
-            if (!inProgress && error is! RequestException)
-              Text(
-                translate('network_error_tip'),
-                style: const TextStyle(fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-            TextButton(
-              onPressed: inProgress ? null : _fetchLoginOptions,
-              child: Text(translate('Retry')),
-            ),
-          ],
-        );
-      }
-      if (loginOptions.isEmpty) return const SizedBox.shrink();
-      return Column(
-        children: [
-          const SizedBox(height: 8.0),
-          Center(
-              child: Text(translate('or'), style: const TextStyle(fontSize: 16))),
-          const SizedBox(height: 8.0),
-          LoginWidgetOP(
-            ops: loginOptions
-                .map((e) => ConfigOP(op: e['name'], icon: e['icon']))
-                .toList(),
-            curOP: oidcAuth.curOP,
-            startAuth: oidcAuth.start,
-            cancelAuth: oidcAuth.cancelCurrent,
-            canStartAuth: oidcAuth.canStart,
-            cbLogin: (Map<String, dynamic> authBody) async {
-              try {
-                final resp =
-                    gFFI.userModel.getLoginResponseFromAuthBody(authBody);
-                await _handleLoginResponse(resp);
-              } catch (e) {
-                debugPrint('Failed to parse oidc login body: "$authBody" $e');
-              }
-            },
-          ),
-        ],
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.background,
-      child: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    translate('Login'),
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 16),
-                  LoginWidgetUserPass(
-                    username: username,
-                    pass: password,
-                    usernameMsg: usernameMsg,
-                    passMsg: passwordMsg,
-                    isInProgress: isInProgress,
-                    curOP: oidcAuth.curOP,
-                    onLogin: _onLogin,
-                    userFocusNode: userFocusNode,
-                  ),
-                  _thirdAuthWidget(),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 void logOutConfirmDialog() {
