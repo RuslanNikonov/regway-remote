@@ -8,6 +8,8 @@
 # Каждая замена проверяется: если в новом теге upstream строка изменилась — скрипт падает,
 # а не тихо собирает клиент со старыми серверами RustDesk.
 set -euo pipefail
+# Windows GitHub runners use cp1252 for Python stdout; keep UTF-8 for Cyrillic logs.
+export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RD="$(cd "${1:-$HERE/rustdesk}" && pwd)"
@@ -45,6 +47,11 @@ fi
 export RD APP_NAME APP_DISPLAY_NAME ORG BUNDLE_ID COMPANY ID_SERVER ID_HOST RELAY_SERVER API_SERVER KEY WEBSITE_URL DOMAIN
 python3 - <<'PY'
 import os, re, sys, pathlib
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 E = os.environ
 RD = pathlib.Path(E["RD"])
 errors = []
@@ -255,7 +262,13 @@ print("branding: исходники пропатчены")
 PY
 
 # ---------- 5. Иконки и картинки установщиков ----------
-cp_req() { [ -f "$1" ] || { echo "нет файла дизайна: $1" >&2; exit 1; }; install -D -m 644 "$1" "$2"; }
+# GNU install -D is not BSD install (macOS); copy portably.
+cp_req() {
+  [ -f "$1" ] || { echo "нет файла дизайна: $1" >&2; exit 1; }
+  mkdir -p "$(dirname "$2")"
+  cp -f "$1" "$2"
+  chmod 644 "$2"
+}
 I="$DESIGN/icon"; P="$I/png"; S="$DESIGN/installer"
 cp_req "$I/icon.ico"            "$RD/res/icon.ico"                                  # exe (build.rs, portable), MSI (preprocess.py -> Package/Resources)
 T="$DESIGN/tray"
@@ -274,6 +287,6 @@ cp_req "$I/icon.png"            "$RD/flutter/assets/icon.png"                   
 cp_req "$S/wix-banner-493x58.bmp"  "$RD/res/msi/Package/Resources/WixUIBannerBmp.bmp"  # preprocess.py подхватит автоматически
 cp_req "$S/wix-dialog-493x312.bmp" "$RD/res/msi/Package/Resources/WixUIDialogBmp.bmp"
 cp_req "$S/dmg-background.png"     "$RD/res/regway/dmg-background.png"                 # для create-dmg --background (CI)
-[ -f "$S/dmg-background@2x.png" ] && install -D -m 644 "$S/dmg-background@2x.png" "$RD/res/regway/dmg-background@2x.png"
+[ -f "$S/dmg-background@2x.png" ] && cp_req "$S/dmg-background@2x.png" "$RD/res/regway/dmg-background@2x.png"
 echo "branding: иконки разложены"
 echo "branding: OK ($APP_NAME, id=$ID_SERVER, relay=$RELAY_SERVER)"
