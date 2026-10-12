@@ -1153,6 +1153,11 @@ fn get_api_server_(api: String, custom: String) -> String {
     }
     let s0 = get_custom_rendezvous_server(custom);
     if !s0.is_empty() {
+        // Port 21114 is not exposed; API is only https://remote.regway.group (nginx).
+        let host = s0.split(':').next().unwrap_or(s0.as_str());
+        if host.eq_ignore_ascii_case("remote.regway.group") {
+            return "https://remote.regway.group".to_owned();
+        }
         let s = crate::increase_port(&s0, -2);
         if s == s0 {
             return format!("http://{}:{}", s, config::RENDEZVOUS_PORT - 2);

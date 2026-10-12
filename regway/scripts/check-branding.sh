@@ -35,7 +35,7 @@ rg() {
 }
 
 PAT='rustdesk\.com|rs-ny|rs-sg|rs-cn'
-ALLOW='^(src/common\.rs:(1031|117[0-9]|3[0-9]{3}):|libs/hbb_common/src/socket_client\.rs:3(1[0-9]|2[0-9]):|libs/hbb_common/src/websocket\.rs:(4[89][0-9]|5[0-9]{2}):)'
+ALLOW='^(src/common\.rs:(1031|11[78][0-9]|3[0-9]{3}):|libs/hbb_common/src/socket_client\.rs:3(1[0-9]|2[0-9]):|libs/hbb_common/src/websocket\.rs:(4[89][0-9]|5[0-9]{2}):)'
 hits="$(rg -n -i "$PAT" src libs/hbb_common/src flutter/lib || true)"
 bad="$(printf '%s\n' "$hits" | rg -v "$ALLOW" | rg -v '^$' || true)"
 echo "== всего совпадений: $(printf '%s\n' "$hits" | rg -c . || echo 0); вне allowlist:"
@@ -65,14 +65,29 @@ rg -q '"relay-server"\.to_owned\(\), "[A-Za-z0-9.-]+:21117"' libs/hbb_common/src
 if rg -n '^\s*get_custom_server_from_string\(&exe\)\s*$' src/platform/windows.rs; then echo "FAIL разбор имени exe активен"; fail=1; fi
 need src/lang/ru.rs '("Closed manually by web console", "Сеанс завершён администратором"),' "ru: «Сеанс завершён администратором»"
 need src/common.rs '"https://remote.regway.group".to_owned()' "fallback API = https://remote.regway.group (без порта)"
+need src/common.rs 'host.eq_ignore_ascii_case("remote.regway.group")' "get_api_server_: наш ID-хост → https://remote.regway.group, не http://host:21114"
 need src/common.rs 'let api_http_port = config::RENDEZVOUS_PORT - 2;' "strip https API-порта через RENDEZVOUS_PORT-2, без литерала :21114"
-# :21114 must not appear in built sources. Tests that assert its absence live in regway/scripts/.
+need libs/hbb_common/src/config.rs 'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("api-server"' "HARD_SETTINGS api-server зашит"
+if [ -f libs/portable/src/res/label.png ]; then
+  echo "OK   libs/portable/src/res/label.png (portable packer splash)"
+else
+  echo "FAIL нет libs/portable/src/res/label.png (rustdesk-portable-packer include_bytes)"
+  fail=1
+fi
+# :21114 / http://remote.regway.group must not appear in built sources.
 if hits21114="$(rg -n -F ':21114' src libs flutter/lib || true)" && [ -n "$hits21114" ]; then
   echo "FAIL :21114 в исходниках сборки:"
   echo "$hits21114"
   fail=1
 else
   echo "OK   :21114 нет в src/ libs/ flutter/lib/"
+fi
+if hitshttp="$(rg -n -F 'http://remote.regway.group' src libs flutter/lib || true)" && [ -n "$hitshttp" ]; then
+  echo "FAIL http://remote.regway.group в исходниках сборки:"
+  echo "$hitshttp"
+  fail=1
+else
+  echo "OK   http://remote.regway.group нет в src/ libs/ flutter/lib/"
 fi
 # Строгий режим (CI релиза): хосты ровно remote.regway.group
 if [ "${REQUIRE_REAL_KEY:-0}" = 1 ]; then
@@ -81,6 +96,7 @@ if [ "${REQUIRE_REAL_KEY:-0}" = 1 ]; then
   need libs/hbb_common/src/config.rs "(\"custom-rendezvous-server\".to_owned(), \"$H\".to_owned())" "strict: ID = $H"
   need libs/hbb_common/src/config.rs "(\"relay-server\".to_owned(), \"$H:21117\".to_owned())" "strict: relay = $H:21117"
   need libs/hbb_common/src/config.rs "(\"api-server\".to_owned(), \"https://$H\".to_owned())" "strict: API = https://$H"
+  need libs/hbb_common/src/config.rs "pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([(\"api-server\".to_owned(), \"https://$H\".to_owned())]));" "strict: HARD_SETTINGS api-server = https://$H"
   if rg -q 'pub const RS_PUB_KEY: &str = "REPLACE_' libs/hbb_common/src/config.rs; then echo "FAIL strict: ключ-плейсхолдер"; fail=1; else echo "OK   strict: ключ не плейсхолдер"; fi
 fi
 exit $fail

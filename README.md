@@ -49,11 +49,11 @@ REQUIRE_REAL_KEY=1 regway/scripts/check-branding.sh .
 
 | Что | Где (реальные пути тега 1.5.0) |
 |---|---|
-| Встроенный ID-сервер | `libs/hbb_common/src/config.rs`: `RENDEZVOUS_SERVERS` (был `rs-ny.rustdesk.com`), `PROD_RENDEZVOUS_SERVER` |
+| Встроенный ID-сервер | `libs/hbb_common/src/config.rs`: `RENDEZVOUS_SERVERS` и `PROD_RENDEZVOUS_SERVER` (compiled default) **и** `OVERWRITE_SETTINGS["custom-rendezvous-server"]` (пользователь не может переопределить). Оба задаёт `apply-branding.sh`. |
 | Встроенный ключ | `config.rs`: `RS_PUB_KEY` (был ключ публичных серверов RustDesk) |
-| Запрет смены сервера | `config.rs`: `OVERWRITE_SETTINGS` = `custom-rendezvous-server`, `relay-server`, `api-server`(пусто), `key`, `allow-auto-update=N`; `BUILTIN_SETTINGS` = `hide-server-settings=Y`, `allow-deep-link-server-settings=N` |
+| Запрет смены сервера | `config.rs`: `OVERWRITE_SETTINGS` = `custom-rendezvous-server`, `relay-server`, `api-server=https://remote.regway.group`, `key`, `allow-auto-update=N`; `HARD_SETTINGS` = `api-server=https://remote.regway.group`; `BUILTIN_SETTINGS` = `hide-server-settings=Y`, `allow-deep-link-server-settings=N` |
 | Проверка обновлений | `OVERWRITE_LOCAL_SETTINGS` `enable-check-update=N`; `check_software_update()` в `src/common.rs` всегда выходит; URL `api.rustdesk.com/version/latest` в `libs/hbb_common/src/lib.rs` обнулён |
-| API (rustdesk-api lejianwen) | `OVERWRITE_SETTINGS` `api-server=$API_SERVER` (`https://remote.regway.group`). `register-device` **не** задаём (иначе `get_api_server()` вернёт `""` и отключит логин, heartbeat, sysinfo, audit). Вход в учётку доступен: вкладка «Учётная запись» зависит только от `disable-account` (HARD_SETTINGS), который мы не задаём; `hide-server-settings` скрывает только раздел ID/Relay/API/Key. Фолбэк `admin.rustdesk.com` в `get_api_server_` заменён на `https://<ID-хост>` (без порта), но не достигается, т.к. API задан |
+| API (rustdesk-api lejianwen) | `OVERWRITE_SETTINGS` `api-server=$API_SERVER` (`https://remote.regway.group`). `register-device` **не** задаём (иначе `get_api_server()` вернёт `""` и отключит логин, heartbeat, sysinfo, audit). Вход в учётку доступен: вкладка «Учётная запись» зависит только от `disable-account` (HARD_SETTINGS), который мы не задаём; `hide-server-settings` скрывает только раздел ID/Relay/API/Key. API зашит в `OVERWRITE_SETTINGS` и `HARD_SETTINGS` (`api-server=https://remote.regway.group`). В `get_api_server_`, если ID-хост `remote.regway.group` (с портом или без), возвращается `https://remote.regway.group`, а не `http://host:21114` (порт снаружи закрыт) |
 | Heartbeat → отзыв токена | `src/hbbs_http/sync.rs`: heartbeat несёт `Authorization: Bearer <access_token>` (если токен есть в LocalConfig процесса), статус читается через `post_request_with_status`; 2 подряд **HTTP 401** при отправленном токене → закрыть все входящие сеансы (канал `disconnect`) и стереть `access_token`/`user_info`. Подробно: `docs/heartbeat-revocation.md` |
 | Windows: сервер из имени exe | `src/platform/windows.rs` `get_license_from_exe_name()` всегда `Err` → имена `…-host=X,key=Y,api=…,relay=….exe` и `…-licensed-<base64>.exe` игнорируются во всех местах (`get_custom_rendezvous_server`, `get_api_server_`, `get_key`, `get_rendezvous_server`, `bootstrap()`→`EXE_RENDEZVOUS_SERVER`, `ui_interface::get_license`). `get_license()` при установке не берёт Key/Host/Api из реестра; `core_main.rs` CLI `--config <строка>` отключён. Остальная логика имени (portable `RUSTDESK_APPNAME`, переименование в `<APP_NAME>.exe` при установке) не тронута |
 | Текст разрыва сеанса | `src/lang/ru.rs`: «Closed manually by web console» → «Сеанс завершён администратором» (видит управляющая сторона при `disconnect` от API или отзыве токена) |
@@ -64,7 +64,7 @@ REQUIRE_REAL_KEY=1 regway/scripts/check-branding.sh .
 | macOS метаданные | `flutter/macos/Runner/Configs/AppInfo.xcconfig` (`PRODUCT_NAME` → `RegWayRemote.app`, bundle id), `flutter/macos/Runner/Info.plist` (URL scheme, `CFBundleDisplayName`), `build.py` (путь к `.app`), `Cargo.toml [package.metadata.bundle]` |
 | MSI | имя через `res/msi/preprocess.py --app-name RegWayRemote` (в CI) |
 | Иконки | `res/icon.ico`, `res/tray-icon.ico`, `res/icon.png`, `res/mac-icon.png`, `res/32x32.png`, `64x64`, `128x128`, `128x128@2x`, `flutter/windows/runner/resources/app_icon.ico`, `flutter/macos/Runner/AppIcon.icns`, `flutter/assets/icon.png` (логотип в окне и трей) |
-| Картинки установщиков | `res/msi/Package/Resources/WixUIBannerBmp.bmp`, `WixUIDialogBmp.bmp` (preprocess.py подхватывает сам); `res/regway/dmg-background.png` → `create-dmg --background` в CI |
+| Картинки установщиков | `res/msi/Package/Resources/WixUIBannerBmp.bmp`, `WixUIDialogBmp.bmp` (preprocess.py подхватывает сам); `res/regway/dmg-background.png` → `create-dmg --background` в CI; `libs/portable/src/res/label.png` (96×32, splash `rustdesk-portable-packer`, `include_bytes!`) |
 
 Не применяется: **NSIS-картинки** — в RustDesk 1.5.0 нет NSIS-инсталлятора (Windows `.exe` = самораспаковывающийся `libs/portable` + встроенный установщик приложения, `.msi` = WiX v4). Файлы `nsis-*.bmp` лежат в `branding/design/` на случай, если появится свой NSIS. Иконки трея — из `design/tray/` (см. таблицу).
 
@@ -76,7 +76,7 @@ REQUIRE_REAL_KEY=1 regway/scripts/check-branding.sh .
 
 `regway/scripts/check-branding.sh` ищет `rustdesk.com|rs-ny|rs-sg|rs-cn` в `src`, `libs/hbb_common/src`, `flutter/lib`. Допустимые остатки (allowlist):
 * `src/common.rs:1031` — комментарий;
-* `src/common.rs:1175` — `is_public()`: **детектор** «это публичный сервер RustDesk?», сам никуда не подключается;
+* `src/common.rs:1181` — `is_public()`: **детектор** «это публичный сервер RustDesk?», сам никуда не подключается;
 * `src/common.rs:3xxx`, `libs/hbb_common/src/websocket.rs:48x–52x`, `socket_client.rs:31x–32x` — `#[cfg(test)]` юнит-тесты.
 
 Вне этих каталогов (`res/`, `flatpak/`, `fastlane/`, `Cargo.toml` deps `rustdesk-org/*` на GitHub, драйверы `github.com/rustdesk/...` в CI) — метаданные пакетов и источники зависимостей сборки, не код подключения.
@@ -105,12 +105,12 @@ REQUIRE_REAL_KEY=1 regway/scripts/check-branding.sh .
 |---|---|---|
 | `RS_PUB_KEY` | да для релиза (`REQUIRE_REAL_KEY=1` при push тега и по умолчанию в dispatch) | содержимое `data/id_ed25519.pub` |
 
-При `REQUIRE_REAL_KEY=1` `apply-branding.sh` падает, если: KEY не 44-символьный base64 ed25519; хосты не **ровно** `remote.regway.group` (ID), `remote.regway.group:21117` (relay), `https://remote.regway.group` (API) — хост зашит в скрипте (`REGWAY_HOST`), а не берётся из окружения; `WEBSITE_URL`/`DOMAIN` содержат example.*. `check-branding.sh` при `REQUIRE_REAL_KEY=1` дополнительно проверяет эти значения в `config.rs` и что ключ не плейсхолдер-строка. Тесты: `scripts/test-branding.sh` (15 случаев). `WEBSITE_URL` проверяется тоже: ссылки «Сайт/Скачать/Конфиденциальность» на example.com в релизе — дефект. Домен прописан: `remote.regway.group` (ID), `remote.regway.group:21117` (relay), `https://remote.regway.group` (API и WEBSITE_URL).
+При `REQUIRE_REAL_KEY=1` `apply-branding.sh` падает, если: KEY не 44-символьный base64 ed25519; хосты не **ровно** `remote.regway.group` (ID), `remote.regway.group:21117` (relay), `https://remote.regway.group` (API) — хост зашит в скрипте (`REGWAY_HOST`), а не берётся из окружения; `WEBSITE_URL`/`DOMAIN` содержат example.*. `check-branding.sh` при `REQUIRE_REAL_KEY=1` дополнительно проверяет эти значения в `config.rs` и что ключ не плейсхолдер-строка. Тесты: `scripts/test-branding.sh` (17 случаев, включая отсутствие `:21114` / `http://remote.regway.group`). `WEBSITE_URL` проверяется тоже: ссылки «Сайт/Скачать/Конфиденциальность» на example.com в релизе — дефект. Домен прописан: `remote.regway.group` (ID), `remote.regway.group:21117` (relay), `https://remote.regway.group` (API и WEBSITE_URL).
 | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`, `AZURE_CERT_PROFILE` | нет | подпись Windows через Azure Artifact Signing (бывш. Trusted Signing). Без них шаги пропускаются |
 | `MACOS_P12_BASE64`, `MACOS_P12_PASSWORD`, `MACOS_CODESIGN_IDENTITY` | нет | Developer ID Application (.p12) для `codesign` |
 | `APPLE_API_KEY_P8_BASE64`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID` | нет | App Store Connect API key для `notarytool` |
 
-Без secrets сборка проходит и даёт **неподписанные** файлы. Как добавить: Settings → Secrets and variables → Actions, или `gh secret set RS_PUB_KEY < id_ed25519.pub`. Локально секреты держим только в файлах с `chmod 600` (каталог `secrets/` в `.gitignore`).
+Без secrets сборка проходит: Windows — без подписи; macOS `.app` и `.dmg` получают **ad-hoc** `codesign` (`-s -`), чтобы arm64 не показывал «приложение повреждено» из‑за quarantine (остаётся предупреждение «неизвестный разработчик»). Developer ID + нотаризация — только если заданы `MACOS_*` / `APPLE_*` secrets. Как добавить: Settings → Secrets and variables → Actions, или `gh secret set RS_PUB_KEY < id_ed25519.pub`. Локально секреты держим только в файлах с `chmod 600` (каталог `secrets/` в `.gitignore`).
 
 Отличия от upstream-workflow: убраны Windows arm64, sciter, Linux/Android/iOS, SBOM, их сервис подписи `SIGN_BASE_URL`, публикация в их релиз `nightly`, сборка `RustDeskTempTopMostWindow` (нужна только для «режима конфиденциальности» в варианте с внедрением в процесс; без неё сборка проходит, privacy mode 2 по-прежнему работает через виртуальный дисплей — проверить на QA). Нотаризация — `xcrun notarytool` вместо `rcodesign`.
 

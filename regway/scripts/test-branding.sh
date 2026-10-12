@@ -6,7 +6,7 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"; SRC="$(cd "${1:-$HERE/rustdesk}" && pw
 FK="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="   # фиктивный ключ правильного формата
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 pass=0; failn=0
-fresh() { rm -rf "$TMP/rd"; cp -r "$SRC" "$TMP/rd"; (cd "$TMP/rd" && git checkout -q . && git clean -qfdx -e target && git -C libs/hbb_common checkout -q .); }
+fresh() { rm -rf "$TMP/rd"; cp -r "$SRC" "$TMP/rd"; (cd "$TMP/rd" && git checkout -q . && git clean -qfdx -e target && { [ -d libs/hbb_common/.git ] && git -C libs/hbb_common checkout -q . || true; }); }
 t() { # name expected_rc env...
   local n="$1" exp="$2"; shift 2; fresh
   env "$@" bash "$HERE/scripts/apply-branding.sh" "$TMP/rd" >"$TMP/o" 2>&1; local rc=$?
@@ -34,4 +34,23 @@ bash "$HERE/scripts/apply-branding.sh" "$TMP/rd" >/dev/null 2>&1; h2=$(cd "$TMP/
 [ "$h1" = "$h2" ] && { echo "PASS idempotent"; pass=$((pass+1)); } || { echo "FAIL idempotent"; failn=$((failn+1)); }
 # check-branding на непропатченном дереве должен падать
 fresh; bash "$HERE/scripts/check-branding.sh" "$TMP/rd" >/dev/null 2>&1 && { echo "FAIL check on pristine passed"; failn=$((failn+1)); } || { echo "PASS check on pristine fails"; pass=$((pass+1)); }
+# After branding: no :21114 / http://remote.regway.group in built sources; host branch uses https
+fresh
+KEY=$FK bash "$HERE/scripts/apply-branding.sh" "$TMP/rd" >/dev/null 2>&1
+if grep -q 'host.eq_ignore_ascii_case("remote.regway.group")' "$TMP/rd/src/common.rs" \
+   && grep -q 'HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from(\[("api-server"' "$TMP/rd/libs/hbb_common/src/config.rs" \
+   && [ -f "$TMP/rd/libs/portable/src/res/label.png" ] \
+   && ! grep -R -F -n ':21114' --include='*.rs' --include='*.dart' "$TMP/rd/src" "$TMP/rd/libs" "$TMP/rd/flutter/lib" >/dev/null 2>&1 \
+   && ! grep -R -F -n 'http://remote.regway.group' --include='*.rs' --include='*.dart' "$TMP/rd/src" "$TMP/rd/libs" "$TMP/rd/flutter/lib" >/dev/null 2>&1; then
+  echo "PASS branded tree has https API host branch, label.png, no :21114/http://remote.regway.group"; pass=$((pass+1))
+else
+  echo "FAIL branded tree still has :21114 or missing host branch/label.png"; failn=$((failn+1))
+fi
+# check-branding must fail if http://host:21114 is reintroduced
+printf '\nfn _regway_poison() { let _ = "http://remote.regway.group:21114"; }\n' >> "$TMP/rd/src/common.rs"
+if KEY=$FK REQUIRE_REAL_KEY=1 bash "$HERE/scripts/check-branding.sh" "$TMP/rd" >/dev/null 2>&1; then
+  echo "FAIL check-branding missed :21114 poison"; failn=$((failn+1))
+else
+  echo "PASS check-branding rejects :21114 / http://remote.regway.group"; pass=$((pass+1))
+fi
 echo "== $pass passed, $failn failed"; [ $failn = 0 ]

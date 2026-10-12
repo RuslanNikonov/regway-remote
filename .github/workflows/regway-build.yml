@@ -4,8 +4,6 @@
 # Репозиторий = форк RustDesk 1.5.0 с уже применённым брендингом; checkout в ./rustdesk,
 # затем regway/scripts/apply-branding.sh повторно (идемпотентно) подставляет ключ из secret RS_PUB_KEY.
 # Подпись Windows и подпись+нотаризация macOS выполняются ТОЛЬКО если заданы secrets.
-# Полная сборка Windows/macOS — только workflow_dispatch и теги v*.
-# Push в main — только лёгкая проверка брендинга (без Flutter/vcpkg).
 name: RegWay Remote build
 
 on:
@@ -23,7 +21,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: regway-build-${{ github.ref }}
+  # Per-commit group so this test build is not cancelled/queued behind other main runs.
+  group: regway-build-${{ github.sha }}
   cancel-in-progress: false
 
 env:
@@ -49,20 +48,7 @@ env:
   REQUIRE_REAL_KEY: ${{ (github.event_name == 'push' || inputs.release) && '1' || '0' }}
 
 jobs:
-  branding-check:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          path: rustdesk
-      - name: Branding (key from secret, strict host check)
-        run: |
-          bash rustdesk/regway/scripts/apply-branding.sh rustdesk
-          bash rustdesk/regway/scripts/check-branding.sh rustdesk
-
   generate-bridge:
-    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -349,6 +335,16 @@ jobs:
             sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
             sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
           fi
+          # Xcode (ENABLE_HARDENED_RUNTIME=YES + DEVELOPMENT_TEAM) signs the main
+          # binary ad-hoc+runtime while FlutterMacOS.framework keeps Flutter's Team ID.
+          # build.py then copies `service` into the bundle and breaks the seal.
+          sed -i -e 's/ENABLE_HARDENED_RUNTIME = YES;/ENABLE_HARDENED_RUNTIME = NO;/g' \
+            flutter/macos/Runner.xcodeproj/project.pbxproj
+          sed -i -e 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' \
+            flutter/macos/Runner.xcodeproj/project.pbxproj
+          /usr/libexec/PlistBuddy -c 'Delete :com.apple.security.cs.allow-jit' \
+            flutter/macos/Runner/Release.entitlements || true
+          export FLUTTER_XCODE_ENABLE_HARDENED_RUNTIME=NO
           ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
           test -d "flutter/build/macos/Build/Products/Release/${APP_NAME}.app"
 
@@ -364,6 +360,41 @@ jobs:
             ./flutter/macos/Runner/Release.entitlements
           codesign --verify --deep --strict --verbose=2 "./flutter/build/macos/Build/Products/Release/${APP_NAME}.app"
 
+      - name: Ad-hoc codesign app
+        if: env.MACOS_CODESIGN_IDENTITY == ''
+        working-directory: rustdesk
+        run: |
+          # Last bundle mutation before create-dmg. Do not pass --options runtime
+          # or HR entitlements: those left the main binary as adhoc,runtime while
+          # FlutterMacOS.framework kept another Team ID (dyld abort / spctl invalid).
+          APP="./flutter/build/macos/Build/Products/Release/${APP_NAME}.app"
+          codesign --remove-signature --deep "$APP" || true
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          BIN_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
+          MAIN="$APP/Contents/MacOS/$BIN_NAME"
+          FW="$APP/Contents/Frameworks/FlutterMacOS.framework"
+          assert_adhoc_no_runtime() {
+            local name="$1" path="$2" dump
+            dump="$(codesign -dv --verbose=4 "$path" 2>&1)" || {
+              echo "FAIL codesign -dv $name ($path)" >&2
+              echo "$dump" >&2
+              exit 1
+            }
+            echo "===== $name ====="
+            echo "$dump"
+            if echo "$dump" | grep -E '^CodeDirectory' | grep -q 'runtime'; then
+              echo "FAIL $name: CodeDirectory flags contain runtime" >&2
+              exit 1
+            fi
+            if ! echo "$dump" | grep -q 'TeamIdentifier=not set'; then
+              echo "FAIL $name: TeamIdentifier is not 'not set'" >&2
+              exit 1
+            fi
+          }
+          assert_adhoc_no_runtime "main $BIN_NAME" "$MAIN"
+          assert_adhoc_no_runtime "FlutterMacOS.framework" "$FW"
+
       - name: Create dmg
         working-directory: rustdesk
         run: |
@@ -378,6 +409,9 @@ jobs:
             --icon "${APP_NAME}.app" 165 205 --hide-extension "${APP_NAME}.app" \
             --app-drop-link 495 205 \
             "$DMG" "./flutter/build/macos/Build/Products/Release/${APP_NAME}.app"
+          codesign --force -s - "$DMG"
+          codesign --verify --verbose=2 "$DMG"
+          codesign -dv "$DMG"
 
       - name: "[optional] Sign + notarize + staple dmg"
         if: env.MACOS_P12_BASE64 != '' && env.MACOS_CODESIGN_IDENTITY != '' && env.APPLE_API_KEY_P8_BASE64 != ''

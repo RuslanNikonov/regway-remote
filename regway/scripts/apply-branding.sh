@@ -78,6 +78,11 @@ APP, DISP, KEY = E["APP_NAME"], E["APP_DISPLAY_NAME"], E["KEY"]
 ID, RELAY, API, HOST, WEB = E["ID_SERVER"], E["RELAY_SERVER"], E["API_SERVER"], E["ID_HOST"], E["WEBSITE_URL"]
 
 # ---------- 1. Встроенные сервер/ключ/имя (libs/hbb_common/src/config.rs) ----------
+# Host is locked in two places:
+#   RENDEZVOUS_SERVERS + PROD_RENDEZVOUS_SERVER — compiled default (used when
+#     custom-rendezvous-server is empty; get_custom_rendezvous_server falls back here).
+#   OVERWRITE_SETTINGS["custom-rendezvous-server"] — user cannot override via RustDesk2.toml.
+# API is locked the same way as host/key: OVERWRITE_SETTINGS["api-server"] and HARD_SETTINGS.
 cfg = "libs/hbb_common/src/config.rs"
 sub(cfg, r'pub const RENDEZVOUS_SERVERS: &\[&str\] = &\[[^\]]*\];',
     f'pub const RENDEZVOUS_SERVERS: &[&str] = &["{q(ID)}"];', regex=True)
@@ -97,6 +102,8 @@ ow = [("custom-rendezvous-server", ID), ("relay-server", RELAY), ("api-server", 
       ("allow-auto-update", "N")]
 sub(cfg, r'pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = [^\n]*$',
     f'pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = {map_init(ow)}; // RegWay', regex=True)
+sub(cfg, r'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = (?:Default::default\(\)|[^\n]*)$',
+    f'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = {map_init([("api-server", API)])}; // RegWay', regex=True)
 sub(cfg, r'pub static ref OVERWRITE_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = [^\n]*$',
     'pub static ref OVERWRITE_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = '
     + map_init([("enable-check-update", "N")]) + '; // RegWay', regex=True)
@@ -116,10 +123,39 @@ sub("src/common.rs", "pub fn check_software_update() {\n    if is_custom_client(
 sub("src/common.rs",
     r'"(?:https://admin\.rustdesk\.com|https?://[^"]+:21114|https://' + re.escape(HOST) + r')"\.to_owned\(\)',
     f'"https://{q(HOST)}".to_owned()', regex=True)
+_s0_old = (
+    "    if !s0.is_empty() {\n"
+    "        let s = crate::increase_port(&s0, -2);\n"
+    "        if s == s0 {\n"
+    '            return format!("http://{}:{}", s, config::RENDEZVOUS_PORT - 2);\n'
+    "        } else {\n"
+    '            return format!("http://{}", s);\n'
+    "        }\n"
+    "    }"
+)
+_s0_new = (
+    "    if !s0.is_empty() {\n"
+    "        // Port 21114 is not exposed; API is only https://" + HOST + " (nginx).\n"
+    "        let host = s0.split(':').next().unwrap_or(s0.as_str());\n"
+    f'        if host.eq_ignore_ascii_case("{q(HOST)}") {{\n'
+    f'            return "https://{q(HOST)}".to_owned();\n'
+    "        }\n"
+    "        let s = crate::increase_port(&s0, -2);\n"
+    "        if s == s0 {\n"
+    '            return format!("http://{}:{}", s, config::RENDEZVOUS_PORT - 2);\n'
+    "        } else {\n"
+    '            return format!("http://{}", s);\n'
+    "        }\n"
+    "    }"
+)
+sub("src/common.rs", _s0_old, _s0_new)
 # Don't leave a literal ":21114" in built sources; same port as RENDEZVOUS_PORT - 2.
 sub("src/common.rs",
     '    if res.starts_with("https")\n        && res.ends_with(":21114")\n        && get_builtin_option(keys::OPTION_ALLOW_HTTPS_21114) != "Y"\n    {\n        return res.replace(":21114", "");\n    }',
     '    let api_http_port = config::RENDEZVOUS_PORT - 2;\n    if res.starts_with("https")\n        && res.ends_with(&format!(":{api_http_port}"))\n        && get_builtin_option(keys::OPTION_ALLOW_HTTPS_21114) != "Y"\n    {\n        return res.replace(&format!(":{api_http_port}"), "");\n    }')
+# Unit-test fixtures also used :21114; rewrite so check-branding can ban the literal.
+sub("src/common.rs", "https://admin.example.com:21114/", "https://admin.example.com:8443/")
+sub("src/common.rs", "https://[2001:db8::1]:21114/", "https://[2001:db8::1]:8443/")
 
 # ---------- 2b. Windows: запрет сервера/ключа из имени exe (custom_server.rs) ----------
 # get_license_from_exe_name() разбирает имя exe ("...-host=X,key=Y,api=Z,relay=R.exe" и
@@ -287,6 +323,9 @@ cp_req "$I/icon.png"            "$RD/flutter/assets/icon.png"                   
 cp_req "$S/wix-banner-493x58.bmp"  "$RD/res/msi/Package/Resources/WixUIBannerBmp.bmp"  # preprocess.py подхватит автоматически
 cp_req "$S/wix-dialog-493x312.bmp" "$RD/res/msi/Package/Resources/WixUIDialogBmp.bmp"
 cp_req "$S/dmg-background.png"     "$RD/res/regway/dmg-background.png"                 # для create-dmg --background (CI)
+# Portable unpacker splash (rustdesk-portable-packer include_bytes! src/res/label.png).
+# Upstream force-tracks this PNG despite root *png gitignore; we copy a 96x32 RegWay wordmark.
+cp_req "$S/portable-label.png"     "$RD/libs/portable/src/res/label.png"
 [ -f "$S/dmg-background@2x.png" ] && cp_req "$S/dmg-background@2x.png" "$RD/res/regway/dmg-background@2x.png"
 echo "branding: иконки разложены"
 echo "branding: OK ($APP_NAME, id=$ID_SERVER, relay=$RELAY_SERVER)"

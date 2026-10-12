@@ -78,8 +78,10 @@ id_ed25519
 id_rsa
 id_ecdsa
 id_dsa
-# RegWay: наши ассеты (upstream игнорирует *png)
+# RegWay: наши ассеты (upstream игнорирует *png, в т.ч. force-tracked
+# libs/portable/src/res/label.png — без исключения packer не собирается)
 !.github/assets/*.png
 !regway/branding/design/**/*.png
 !res/regway/*.png
 !regway/branding/design/icon/png/
+!libs/portable/src/res/*.png

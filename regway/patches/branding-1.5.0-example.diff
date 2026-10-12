@@ -358,7 +358,18 @@ index 0d46baf..8a77c73 100644
      }
      res
  }
-@@ -1159,7 +1160,7 @@ fn get_api_server_(api: String, custom: String) -> String {
+@@ -1153,13 +1154,18 @@ fn get_api_server_(api: String, custom: String) -> String {
+     let s0 = get_custom_rendezvous_server(custom);
+     if !s0.is_empty() {
++        // Port 21114 is not exposed; API is only https://remote.regway.group (nginx).
++        let host = s0.split(':').next().unwrap_or(s0.as_str());
++        if host.eq_ignore_ascii_case("remote.regway.group") {
++            return "https://remote.regway.group".to_owned();
++        }
+         let s = crate::increase_port(&s0, -2);
+         if s == s0 {
+             return format!("http://{}:{}", s, config::RENDEZVOUS_PORT - 2);
+         } else {
              return format!("http://{}", s);
          }
      }
@@ -367,6 +378,25 @@ index 0d46baf..8a77c73 100644
  }
  
  #[inline]
+@@ -3196,7 +3202,7 @@ fn test_should_use_tcp_proxy_for_api_url() {
+         assert!(should_use_tcp_proxy_for_api_url(
+             "https://admin.example.com/api/login",
+             "https://admin.example.com"
+         ));
+         assert!(should_use_tcp_proxy_for_api_url(
+-            "https://admin.example.com:21114/api/login",
++            "https://admin.example.com:8443/api/login",
+             "https://admin.example.com"
+         ));
+@@ -3358,8 +3364,8 @@ fn test_tcp_proxy_log_target_brackets_ipv6_host_with_port() {
+     fn test_tcp_proxy_log_target_brackets_ipv6_host_with_port() {
+         assert_eq!(
+-            tcp_proxy_log_target("https://[2001:db8::1]:21114/api/heartbeat?token=secret"),
+-            "https://[2001:db8::1]:21114/api/heartbeat"
++            tcp_proxy_log_target("https://[2001:db8::1]:8443/api/heartbeat?token=secret"),
++            "https://[2001:db8::1]:8443/api/heartbeat"
+         );
+     }
 diff --git a/src/core_main.rs b/src/core_main.rs
 index b5a451e..8b2be21 100644
 --- a/src/core_main.rs
@@ -609,7 +639,8 @@ index 6fe1004..d507b0b 100644
      pub static ref DEFAULT_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
 -    pub static ref OVERWRITE_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
 +    pub static ref OVERWRITE_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("enable-check-update".to_owned(), "N".to_owned())])); // RegWay
-     pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
+-    pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
++    pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("api-server".to_owned(), "https://remote.regway.group".to_owned())])); // RegWay
 -    pub static ref BUILTIN_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
 +    pub static ref BUILTIN_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("hide-server-settings".to_owned(), "Y".to_owned()), ("allow-deep-link-server-settings".to_owned(), "N".to_owned())])); // RegWay
  }
