@@ -34,8 +34,8 @@ ID_HOST="${ID_SERVER%%:*}"
 REGWAY_HOST=remote.regway.group
 # Защита от сборки с плейсхолдерами: при REQUIRE_REAL_KEY=1 запрещены example.* в адресах и сайте
 if [ "${REQUIRE_REAL_KEY:-0}" = 1 ]; then
-  for v in ID_SERVER RELAY_SERVER API_SERVER WEBSITE_URL DOMAIN; do
-    if printf '%s' "${!v}" | grep -qiE '(^|[./@])example\.(com|net|org)([:/]|$)'; then
+  for v in ID_SERVER RELAY_SERVER API_SERVER WEBSITE_URL HELP_URL DOMAIN; do
+    if printf '%s' "${!v:-}" | grep -qiE '(^|[./@])example\.(com|net|org)([:/]|$)'; then
       echo "ОШИБКА: $v='${!v}' — плейсхолдер example.*; задайте реальный домен (REQUIRE_REAL_KEY=1)" >&2; exit 1
     fi
   done
@@ -60,7 +60,7 @@ if [ "${REQUIRE_REAL_KEY:-0}" = 1 ]; then
   echo "OK   RS_PUB_KEY matches expected hbbs public key"
 fi
 
-export RD APP_NAME APP_DISPLAY_NAME ORG BUNDLE_ID COMPANY ID_SERVER ID_HOST RELAY_SERVER API_SERVER KEY WEBSITE_URL DOMAIN
+export RD APP_NAME APP_DISPLAY_NAME ORG BUNDLE_ID COMPANY ID_SERVER ID_HOST RELAY_SERVER API_SERVER KEY WEBSITE_URL HELP_URL DOMAIN
 python3 - <<'PY'
 import os, re, sys, pathlib
 try:
@@ -92,6 +92,9 @@ def sub(rel, pattern, repl, *, regex=False, required=True, count=0, skip_if=None
 q = lambda v: v.replace("\\", "\\\\").replace('"', '\\"')
 APP, DISP, KEY = E["APP_NAME"], E["APP_DISPLAY_NAME"], E["KEY"]
 ID, RELAY, API, HOST, WEB = E["ID_SERVER"], E["RELAY_SERVER"], E["API_SERVER"], E["ID_HOST"], E["WEBSITE_URL"]
+HELP = E.get("HELP_URL") or (WEB.rstrip("/") + "/help/")
+if not HELP.endswith("/"):
+    HELP += "/"
 
 # ---------- 1. Встроенные сервер/ключ/имя (libs/hbb_common/src/config.rs) ----------
 # Host is locked in two places:
@@ -127,8 +130,8 @@ sub(cfg, r'pub static ref OVERWRITE_LOCAL_SETTINGS: RwLock<HashMap<String, Strin
 sub(cfg, r'pub static ref BUILTIN_SETTINGS: RwLock<HashMap<String, String>> = [^\n]*$',
     'pub static ref BUILTIN_SETTINGS: RwLock<HashMap<String, String>> = '
     + map_init([("hide-server-settings", "Y"), ("allow-deep-link-server-settings", "N")]) + '; // RegWay', regex=True)
-sub(cfg, r'pub const LINK_DOCS_HOME: &str = "[^"]*";', f'pub const LINK_DOCS_HOME: &str = "{q(WEB)}";', regex=True)
-sub(cfg, r'pub const LINK_DOCS_X11_REQUIRED: &str = "[^"]*";', f'pub const LINK_DOCS_X11_REQUIRED: &str = "{q(WEB)}";', regex=True)
+sub(cfg, r'pub const LINK_DOCS_HOME: &str = "[^"]*";', f'pub const LINK_DOCS_HOME: &str = "{q(HELP)}";', regex=True)
+sub(cfg, r'pub const LINK_DOCS_X11_REQUIRED: &str = "[^"]*";', f'pub const LINK_DOCS_X11_REQUIRED: &str = "{q(HELP)}";', regex=True)
 
 # ---------- 2. Проверка обновлений / API RustDesk ----------
 sub("libs/hbb_common/src/lib.rs", 'const URL: &str = "https://api.rustdesk.com/version/latest";',
@@ -277,6 +280,15 @@ for rel in ["flutter/lib/common.dart", "flutter/lib/desktop/pages/desktop_settin
             "src/client.rs", "src/lang/en.rs"]:
     sub(rel, url_re, WEB, regex=True, required=False)
 sub("flutter/lib/mobile/pages/settings_page.dart", "Text('rustdesk.com',", f"Text('{E['DOMAIN']}',", required=False)
+# Help/Помощь → /help/, not the API root (which is /_admin/)
+sub("src/lang/en.rs", r'\("doc_mac_permission", "[^"]*"\)',
+    f'("doc_mac_permission", "{q(HELP)}")', regex=True)
+sub("src/lang/en.rs", r'\("doc_fix_wayland", "[^"]*"\)',
+    f'("doc_fix_wayland", "{q(HELP)}")', regex=True)
+sub("src/client.rs", r'pub const SCRAP_X11_REF_URL: &str = "[^"]*";',
+    f'pub const SCRAP_X11_REF_URL: &str = "{q(HELP)}";', regex=True)
+sub("src/client.rs", r'(LOGIN_SCREEN_WAYLAND, LoginErrorMsgBox\{[^}]*link: )"[^"]*"',
+    rf'\1"{q(HELP)}"', regex=True)
 
 # ---------- 4. Имена приложения / метаданные ----------
 sub("Cargo.toml", r'^ProductName = "[^"]*"', f'ProductName = "{q(DISP)}"', regex=True)
