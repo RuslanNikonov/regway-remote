@@ -185,7 +185,9 @@ jobs:
       - name: Assert hbbs public key is in the Windows binary
         shell: bash
         working-directory: rustdesk
-        run: bash ./regway/scripts/check-key-in-binary.sh "./rustdesk/${APP_NAME}.exe"
+        # Flutter runner .exe does not contain RS_PUB_KEY; it lives in librustdesk.dll.
+        # Scan the whole Release dir (same idea as the macOS .app check).
+        run: bash ./regway/scripts/check-key-in-binary.sh "./rustdesk"
       - name: Copy Runner.res for portable packer
         continue-on-error: true
         shell: bash
