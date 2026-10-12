@@ -58,6 +58,16 @@ rg -q '"api-server"\.to_owned\(\), "https://[A-Za-z0-9.-]+"' libs/hbb_common/src
 if rg -q '\("register-device"\.to_owned\(\)' libs/hbb_common/src/config.rs; then echo "FAIL register-device задан (отключит API)"; fail=1; else echo "OK   register-device не задан (логин/heartbeat/audit работают)"; fi
 need src/hbbs_http/sync.rs 'Ok((401, _)) if !token.is_empty() => {' "heartbeat: реакция только на HTTP 401 при отправленном токене"
 need src/hbbs_http/sync.rs 'fn regway_revoke_sessions(token: &str)' "heartbeat: закрытие входящих сеансов + сброс токена"
+need src/login_gate.rs 'pub const CHECK_INTERVAL: Duration = Duration::from_secs(30);' "login-gate: 30s token heartbeat"
+need src/login_gate.rs 'pub const OFFLINE_GRACE: Duration = Duration::from_secs(24 * 60 * 60);' "login-gate: 24h offline grace"
+need src/login_gate.rs 'log, tokio, ResultType,' "login-gate: tokio via hbb_common (not a crate dep)"
+need src/login_gate.rs 'pub fn decide_auth_check(status: Option<u16>, body: &str) -> AuthCheckOutcome' "login-gate: 401 revoke / network grace"
+need src/login_gate.rs 'fn http_401_unauthorized_revokes' "login-gate: unit test 401 → revoke"
+need src/login_gate.rs 'fn network_error_uses_grace_not_revoke' "login-gate: unit test network error → grace"
+need src/server.rs 'crate::login_gate::refuse_incoming()' "login-gate: incoming refused without token"
+need src/client.rs 'crate::login_gate::refuse_outgoing()' "login-gate: outgoing refused without token"
+need flutter/lib/common/widgets/login.dart 'class LoginGatePage extends StatefulWidget' "login-gate: full-window Flutter gate"
+need src/lang/ru.rs '("UserDisabled", "Аккаунт отключён администратором"),' "login-gate: UserDisabled ru"
 need libs/hbb_common/src/config.rs '("hide-server-settings".to_owned(), "Y".to_owned())' "раздел сервера скрыт"
 rg -q '"relay-server"\.to_owned\(\), "[A-Za-z0-9.-]+:21117"' libs/hbb_common/src/config.rs \
   && echo "OK   relay = <хост>:21117" || { echo "FAIL relay не <хост>:21117"; fail=1; }

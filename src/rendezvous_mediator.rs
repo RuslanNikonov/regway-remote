@@ -279,6 +279,7 @@ impl RendezvousMediator {
             }
         }
         crate::hbbs_http::sync::start();
+        crate::login_gate::start_periodic_check();
         #[cfg(target_os = "windows")]
         if crate::platform::is_installed() && crate::is_server() {
             crate::updater::start_auto_update();
@@ -308,6 +309,7 @@ impl RendezvousMediator {
             let conn_start_time = Instant::now();
             *SOLVING_PK_MISMATCH.lock().await = "".to_owned();
             if !config::option2bool("stop-service", &Config::get_option("stop-service"))
+                && crate::login_gate::is_session_allowed()
                 && !crate::platform::installing_service()
             {
                 let mut futs = Vec::new();
@@ -336,6 +338,11 @@ impl RendezvousMediator {
                 join_all(futs).await;
             } else {
                 server.write().unwrap().close_connections();
+                Config::reset_online();
+                // Re-check login-gate every second so a successful login
+                // registers with hbbs without waiting CONNECT_TIMEOUT.
+                sleep(1.).await;
+                continue;
             }
             Config::reset_online();
             let timeout = *timeout.read().unwrap();

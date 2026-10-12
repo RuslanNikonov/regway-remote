@@ -285,6 +285,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("android_start_service_tip", ""),
         ("android_permission_may_not_change_tip", ""),
         ("Account", ""),
+        ("UserDisabled", ""),
         ("Overwrite", ""),
         ("This file exists, skip or overwrite this file?", ""),
         ("Quit", ""),

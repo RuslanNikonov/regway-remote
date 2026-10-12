@@ -63,6 +63,7 @@ mod ui_interface;
 mod ui_session_interface;
 
 mod hbbs_http;
+mod login_gate;
 
 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 pub mod clipboard_file;

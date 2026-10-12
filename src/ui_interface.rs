@@ -246,7 +246,30 @@ pub fn get_builtin_option(key: &str) -> String {
 
 #[inline]
 pub fn set_local_option(key: String, value: String) {
-    LocalConfig::set_option(key.clone(), value);
+    LocalConfig::set_option(key.clone(), value.clone());
+    if key == "access_token" {
+        crate::login_gate::on_access_token_changed(&value);
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            let ok = !value.is_empty();
+            set_option(
+                crate::login_gate::LOGIN_OK.to_owned(),
+                if ok { "Y".to_owned() } else { "N".to_owned() },
+            );
+            set_option(
+                crate::login_gate::LOGIN_TOKEN.to_owned(),
+                value.clone(),
+            );
+            set_option(
+                crate::login_gate::TOKEN_VALIDATED_AT.to_owned(),
+                if ok {
+                    crate::login_gate::unix_now().to_string()
+                } else {
+                    "".to_owned()
+                },
+            );
+        }
+    }
 }
 
 /// Resolve relative avatar path (e.g. "/avatar/xxx") to absolute URL
@@ -1276,6 +1299,7 @@ pub fn new_remote(id: String, remote_type: String, force_relay: bool) {
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub fn start_option_status_sync() {
     let _sender = SENDER.lock().unwrap();
+    crate::login_gate::start_periodic_check();
 }
 
 // not call directly

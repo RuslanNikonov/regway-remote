@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/common/widgets/login.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:get/get.dart';
 import 'package:window_manager/window_manager.dart';
 // import 'package:flutter/services.dart';
@@ -20,6 +22,7 @@ class DesktopTabPage extends StatefulWidget {
 
   static void onAddSetting(
       {SettingsTabKey initialPage = SettingsTabKey.general}) {
+    if (!gFFI.userModel.isLogin) return;
     try {
       DesktopTabController tabController = Get.find<DesktopTabController>();
       tabController.add(TabInfo(
@@ -39,6 +42,7 @@ class DesktopTabPage extends StatefulWidget {
 
 class _DesktopTabPageState extends State<DesktopTabPage> {
   final tabController = DesktopTabController(tabType: DesktopTabType.main);
+  Worker? _loginGateWorker;
 
   _DesktopTabPageState() {
     RemoteCountState.init();
@@ -69,6 +73,11 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
   void initState() {
     super.initState();
     // HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+    _loginGateWorker = ever(gFFI.userModel.userName, (name) {
+      if (name.toString().isEmpty && isDesktop) {
+        rustDeskWinManager.closeAllSubWindows();
+      }
+    });
   }
 
   /*
@@ -84,6 +93,7 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
   @override
   void dispose() {
     // HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    _loginGateWorker?.dispose();
     Get.delete<DesktopTabController>();
 
     super.dispose();
@@ -106,7 +116,7 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
                 ),
               ),
             )));
-    return isMacOS || kUseCompatibleUiMode
+    final framed = isMacOS || kUseCompatibleUiMode
         ? tabWidget
         : Obx(
             () => DragToResizeArea(
@@ -115,5 +125,16 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
               child: tabWidget,
             ),
           );
+    return Stack(
+      children: [
+        framed,
+        Obx(() {
+          if (gFFI.userModel.isLogin) {
+            return const SizedBox.shrink();
+          }
+          return const Positioned.fill(child: LoginGatePage());
+        }),
+      ],
+    );
   }
 }

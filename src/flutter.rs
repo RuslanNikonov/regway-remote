@@ -1284,6 +1284,7 @@ pub fn session_add(
     is_shared_password: bool,
     conn_token: Option<String>,
 ) -> ResultType<FlutterSession> {
+    crate::login_gate::refuse_outgoing()?;
     let conn_type = if is_file_transfer {
         ConnType::FILE_TRANSFER
     } else if is_view_camera {
@@ -2099,14 +2100,9 @@ pub mod sessions {
         s
     }
 
-    /// Close every client session, returning how many peer sessions were closed.
-    ///
-    /// Used when the UI is gone but the process keeps running, e.g. the Android
-    /// task is swiped away from recents while a foreground service keeps the
-    /// process alive. The orphaned `io_loop` would otherwise keep answering
-    /// `TestDelay`, so the peer never hits its inactivity timeout and the
-    /// session stays established with no way to close it.
-    #[cfg(any(target_os = "android", target_os = "ios"))]
+    /// Close every client (outgoing) session, returning how many peer sessions
+    /// were closed. Used when the UI is gone on Android/iOS and when the
+    /// login-gate revokes a disabled/deleted account on every platform.
     pub fn close_all_sessions() -> usize {
         // Release held keys before draining: the release path sends through
         // `get_cur_session()`, which resolves against SESSIONS, so draining
@@ -2135,6 +2131,8 @@ pub mod sessions {
             }
             session.close();
         }
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        update_session_count_to_server();
         sessions.len()
     }
 

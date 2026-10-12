@@ -529,6 +529,10 @@ impl Connection {
         meta: super::ConnectionMeta,
         unauthorized: UnauthorizedID,
     ) {
+        if crate::login_gate::refuse_incoming().is_err() {
+            log::warn!("login-gate: dropping incoming connection {id} (not logged in)");
+            return;
+        }
         let super::ConnectionMeta {
             control_permissions,
             controlled_context,
