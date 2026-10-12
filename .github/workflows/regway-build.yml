@@ -46,6 +46,9 @@ env:
   # (ID), remote.regway.group:21117 (relay), https://remote.regway.group (API).
   RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
   REQUIRE_REAL_KEY: ${{ (github.event_name == 'push' || inputs.release) && '1' || '0' }}
+  # Windows runners default Python stdout to cp1252; branding scripts print Cyrillic.
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: utf-8
 
 jobs:
   generate-bridge:

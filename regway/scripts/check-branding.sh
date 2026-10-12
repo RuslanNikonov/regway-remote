@@ -2,6 +2,8 @@
 # Проверка: после apply-branding.sh в коде, влияющем на подключение, нет серверов RustDesk.
 # Допустимые остатки (allowlist) — только тесты/комментарии/детектор is_public(), см. README.
 set -euo pipefail
+# Windows GitHub runners use cp1252 for Python stdout; keep UTF-8 for Cyrillic logs.
+export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
 RD="${1:-$(dirname "$0")/../rustdesk}"
 cd "$RD"
 
@@ -114,6 +116,11 @@ echo "== видимый RustDesk в UI"
 python3 - "$RD" <<'PY' || fail=1
 import re, sys
 from pathlib import Path
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 root = Path(sys.argv[1] if len(sys.argv) > 1 else ".")
 allowed_val = re.compile(
     r"based on RustDesk \(AGPL-3\.0\)|Based on RustDesk",
@@ -122,7 +129,7 @@ allowed_val = re.compile(
 fail = 0
 lang_line = re.compile(r'^\s*\("([^"]*)", "(.*)"\),?\s*$')
 for p in sorted((root / "src/lang").glob("*.rs")):
-    for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+    for i, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
         m = lang_line.match(line)
         if not m:
             continue
