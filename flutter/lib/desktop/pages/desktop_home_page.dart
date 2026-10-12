@@ -18,6 +18,11 @@ import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/platform_channel.dart';
+import 'package:flutter_hbb/regway/computers.dart';
+import 'package:flutter_hbb/regway/login_view.dart';
+import 'package:flutter_hbb/regway/nav.dart';
+import 'package:flutter_hbb/regway/shell.dart';
+import 'package:flutter_hbb/regway/theme.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -58,16 +63,69 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final isIncomingOnly = bind.isIncomingOnly();
     return _buildBlock(
-        child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        buildLeftPane(context),
-        if (!isIncomingOnly) const VerticalDivider(width: 1),
-        if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
-      ],
-    ));
+      child: Obx(() {
+        if (RwNav.shouldShowLogin) {
+          return RwLoginPage(onSkip: () => setState(() {}));
+        }
+        final nav = RwNav.selected.value;
+        if (bind.isIncomingOnly()) {
+          return RwShell(
+            nav: nav,
+            onNav: (id) {
+              if (id == RwNavId.settings) {
+                DesktopTabPage.onAddSetting();
+              } else {
+                RwNav.go(id);
+              }
+            },
+            child: const RwThisComputer(),
+          );
+        }
+        Widget body;
+        Widget? rail;
+        switch (nav) {
+          case RwNavId.computers:
+            body = RwComputersPage(helpBanner: _rwHelpBanner());
+            rail = const RwRightRail();
+            break;
+          case RwNavId.connections:
+            body = const RwConnectionsPage();
+            break;
+          case RwNavId.history:
+            body = const RwHistoryPage();
+            break;
+          case RwNavId.settings:
+            body = DesktopSettingPage(
+              key: const ValueKey(kTabLabelSettingPage),
+              initialTabkey: SettingsTabKey.general,
+            );
+            break;
+        }
+        return RwShell(
+          nav: nav,
+          onNav: (id) => RwNav.go(id),
+          child: body,
+          rail: rail,
+        );
+      }),
+    );
+  }
+
+  Widget? _rwHelpBanner() {
+    return FutureBuilder<Widget>(
+      future: Future.value(
+          Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
+      builder: (_, data) {
+        if (data.hasData && data.data is! Container) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: data.data!,
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
   }
 
   Widget _buildBlock({required Widget child}) {
@@ -604,14 +662,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               0, marginTop, 0, bind.isIncomingOnly() ? marginTop : 0),
           child: Container(
               decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Color.fromARGB(255, 226, 66, 188),
-                  Color.fromARGB(255, 244, 114, 124),
-                ],
-              )),
+                  color: RwColors.bg2Fill,
+                  borderRadius: BorderRadius.circular(RwDim.radiusPanel),
+                  border: Border.all(color: RwColors.border)),
               padding: EdgeInsets.all(20),
               child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,

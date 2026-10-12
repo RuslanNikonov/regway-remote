@@ -17,7 +17,9 @@ import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:window_size/window_size.dart' as window_size;
 
 import '../../common.dart';
+import '../../common/formatter/id_formatter.dart';
 import '../../models/model.dart';
+import 'dart:ui' show FontFeature;
 import '../../models/platform_model.dart';
 import '../../common/shared_state.dart';
 import './popup_menu.dart';
@@ -324,13 +326,13 @@ class ToolbarState {
 }
 
 class _ToolbarTheme {
-  static const Color blueColor = MyTheme.button;
-  static const Color hoverBlueColor = MyTheme.accent;
-  static Color inactiveColor = Colors.grey[800]!;
-  static Color hoverInactiveColor = Colors.grey[850]!;
+  static const Color blueColor = Color(0xFF38D9FF);
+  static const Color hoverBlueColor = Color(0xFF6BE3FF);
+  static Color inactiveColor = const Color(0xFF16142C);
+  static Color hoverInactiveColor = const Color(0xFF1E1B3A);
 
-  static const Color redColor = Colors.redAccent;
-  static const Color hoverRedColor = Colors.red;
+  static const Color redColor = Color(0xFFFF3D5E);
+  static const Color hoverRedColor = Color(0xFFFF5A75);
   // kMinInteractiveDimension
   static const double height = 20.0;
   static const double dividerHeight = 12.0;
@@ -802,6 +804,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
   Widget _buildToolbar(
       BuildContext context, _ToolbarEdge edge, bool isHorizontal) {
     final List<Widget> toolbarItems = [];
+    toolbarItems.add(_SessionIdentity(id: widget.id, ffi: widget.ffi));
     toolbarItems.add(_PinMenu(state: widget.state));
     toolbarItems.add(Obx(() {
       final privacyModeState = PrivacyModeState.find(widget.id);
@@ -851,7 +854,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     }
     if (!isWeb) toolbarItems.add(_RecordMenu());
     toolbarItems.add(_CloseMenu(id: widget.id, ffi: widget.ffi));
-    final toolbarBorderRadius = BorderRadius.all(Radius.circular(4.0));
+    final toolbarBorderRadius = BorderRadius.all(Radius.circular(12.0));
     // innerAxis: how the toolbar icons themselves flow.
     // outerAxis: how the toolbar block and the handle stack against each other
     // (perpendicular to the dock edge, so the handle hangs off the interior face).
@@ -2979,17 +2982,128 @@ class _CloseMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _IconMenuButton(
-      assetName: 'assets/close.svg',
-      tooltip: 'Close',
-      onPressed: () async {
-        if (await showConnEndAuditDialogCloseCanceled(ffi: ffi)) {
-          return;
-        }
-        closeConnection(id: id);
-      },
-      color: _ToolbarTheme.redColor,
-      hoverColor: _ToolbarTheme.hoverRedColor,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: Tooltip(
+        message: translate('Disconnect'),
+        child: InkWell(
+          onTap: () async {
+            if (await showConnEndAuditDialogCloseCanceled(ffi: ffi)) {
+              return;
+            }
+            closeConnection(id: id);
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            decoration: BoxDecoration(
+              color: _ToolbarTheme.redColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              translate('Disconnect'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Manrope',
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SessionIdentity extends StatefulWidget {
+  final String id;
+  final FFI ffi;
+  const _SessionIdentity({required this.id, required this.ffi});
+
+  @override
+  State<_SessionIdentity> createState() => _SessionIdentityState();
+}
+
+class _SessionIdentityState extends State<_SessionIdentity> {
+  late DateTime _started;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _started = DateTime.now();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _elapsed() {
+    final d = DateTime.now().difference(_started);
+    two(int n) => n.toString().padLeft(2, '0');
+    return '${two(d.inHours)}:${two(d.inMinutes.remainder(60))}:${two(d.inSeconds.remainder(60))}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final alias = bind.mainGetPeerOptionSync(id: widget.id, key: 'alias');
+    final title = alias.isNotEmpty ? alias : formatID(widget.id);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: const Color(0xFF38D9FF),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                    color: const Color(0xFF38D9FF).withOpacity(0.9),
+                    blurRadius: 8)
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'Unbounded',
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: Color(0xFFEEF0FF),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            formatID(widget.id),
+            style: const TextStyle(
+              fontFamily: 'Manrope',
+              fontSize: 13,
+              color: Color(0xFFA7ABC9),
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '· ${_elapsed()}',
+            style: const TextStyle(
+              fontFamily: 'Manrope',
+              fontSize: 13,
+              color: Color(0xFFA7ABC9),
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
