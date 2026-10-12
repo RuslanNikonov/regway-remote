@@ -309,14 +309,19 @@ async fn start_hbbs_sync_async() {
 // RegWay: the API explicitly rejected our token: close all incoming sessions, forget the token.
 #[cfg(not(any(target_os = "ios")))]
 fn regway_revoke_sessions(token: &str) {
+    log::warn!("API rejected access token");
+    crate::login_gate::revoke("heartbeat 401");
+    close_alive_incoming();
+    let _ = token;
+}
+
+/// Close every live incoming session (login-gate / 401).
+#[cfg(not(any(target_os = "ios")))]
+pub fn close_alive_incoming() {
     let conns = Connection::alive_conns();
-    log::warn!("API rejected access token: closing {} incoming session(s)", conns.len());
     if !conns.is_empty() {
+        log::warn!("login-gate: closing {} incoming session(s)", conns.len());
         SENDER.lock().unwrap().send(conns).ok();
-    }
-    if LocalConfig::get_option("access_token") == token {
-        LocalConfig::set_option("access_token".to_owned(), "".to_owned());
-        LocalConfig::set_option("user_info".to_owned(), "".to_owned());
     }
 }
 

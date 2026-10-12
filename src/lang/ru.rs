@@ -285,6 +285,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("android_start_service_tip", "Нажмите [Запустить службу] или разрешите [Захват экрана], чтобы запустить службу демонстрации экрана."),
         ("android_permission_may_not_change_tip", "Разрешения для установленных подключений не могут быть изменены, необходимо переподключение."),
         ("Account", "Аккаунт"),
+        ("UserDisabled", "Аккаунт отключён администратором"),
         ("Overwrite", "Перезаписать"),
         ("This file exists, skip or overwrite this file?", "Файл существует, пропустить или перезаписать его?"),
         ("Quit", "Выйти"),

@@ -39,10 +39,12 @@ fresh
 KEY=$FK bash "$HERE/scripts/apply-branding.sh" "$TMP/rd" >/dev/null 2>&1
 if grep -q 'host.eq_ignore_ascii_case("remote.regway.group")' "$TMP/rd/src/common.rs" \
    && grep -q 'HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from(\[("api-server"' "$TMP/rd/libs/hbb_common/src/config.rs" \
+   && grep -q 'pub const CHECK_INTERVAL: Duration = Duration::from_secs(30);' "$TMP/rd/src/login_gate.rs" \
+   && grep -q 'fn http_401_unauthorized_revokes' "$TMP/rd/src/login_gate.rs" \
    && [ -f "$TMP/rd/libs/portable/src/res/label.png" ] \
    && ! grep -R -F -n ':21114' --include='*.rs' --include='*.dart' "$TMP/rd/src" "$TMP/rd/libs" "$TMP/rd/flutter/lib" >/dev/null 2>&1 \
    && ! grep -R -F -n 'http://remote.regway.group' --include='*.rs' --include='*.dart' "$TMP/rd/src" "$TMP/rd/libs" "$TMP/rd/flutter/lib" >/dev/null 2>&1; then
-  echo "PASS branded tree has https API host branch, label.png, no :21114/http://remote.regway.group"; pass=$((pass+1))
+  echo "PASS branded tree has https API host branch, login-gate, label.png, no :21114/http://remote.regway.group"; pass=$((pass+1))
 else
   echo "FAIL branded tree still has :21114 or missing host branch/label.png"; failn=$((failn+1))
 fi

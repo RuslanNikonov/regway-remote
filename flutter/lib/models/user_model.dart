@@ -15,6 +15,10 @@ import 'platform_model.dart';
 bool refreshingUser = false;
 
 class UserModel {
+  /// Must stay ≤ 60 s so a disable/delete in /_admin/ drops sessions in time.
+  static const Duration authHeartbeat = Duration(seconds: 30);
+  static const int offlineGraceSecs = 24 * 60 * 60;
+
   final RxString userName = ''.obs;
   final RxString displayName = ''.obs;
   final RxString avatar = ''.obs;
@@ -39,6 +43,7 @@ class UserModel {
   }
 
   WeakReference<FFI> parent;
+  Timer? _authHeartbeat;
 
   UserModel(this.parent) {
     userName.listen((p0) {
@@ -48,6 +53,18 @@ class UserModel {
       //  For login success, should clear network error
       networkError.value = '';
     });
+    _authHeartbeat?.cancel();
+    _authHeartbeat = Timer.periodic(authHeartbeat, (_) {
+      refreshCurrentUser();
+    });
+  }
+
+  bool _withinOfflineGrace() {
+    final raw = bind.mainGetLocalOption(key: 'rw-token-validated-at');
+    final ts = int.tryParse(raw);
+    if (ts == null || ts <= 0) return false;
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return now - ts < offlineGraceSecs;
   }
 
   void refreshCurrentUser() async {
@@ -56,7 +73,11 @@ class UserModel {
     networkErrorFromServer.value = false;
     final token = bind.mainGetLocalOption(key: 'access_token');
     if (token == '') {
-      await updateOtherModels();
+      if (isLogin) {
+        await reset(resetOther: true);
+      } else {
+        await updateOtherModels();
+      }
       return;
     }
     _updateLocalUserInfo();
@@ -77,39 +98,50 @@ class UserModel {
             },
             body: json.encode(body));
       } catch (e) {
+        // Network error is not a 401. Keep the 24 h offline grace.
+        debugPrint('login-gate: currentUser unreachable (network error, not 401): $e');
         networkError.value = e.toString();
-        rethrow;
+        if (!_withinOfflineGrace()) {
+          await reset(resetOther: true);
+        }
+        return;
       }
-      refreshingUser = false;
       final status = response.statusCode;
-      if (status == 401 || status == 400) {
-        reset(resetOther: status == 401);
+      // Disabled account: 401 {"error":"Unauthorized"} — revoke sessions + gate.
+      if (status == 401 || status == 403 || status == 400) {
+        await reset(resetOther: true);
         return;
       }
       final data = json.decode(decode_http_response(response));
       final error = data['error'];
       if (error != null) {
-        // The only failure known to come from the server itself, so the
-        // check-your-network tip does not apply. Flag before the message is
-        // set in the catch below so rebuilds read a consistent pair.
-        networkErrorFromServer.value = true;
-        throw error;
+        await reset(resetOther: true);
+        return;
       }
 
       final user = UserPayload.fromJson(data);
+      if (user.status == UserStatus.kDisabled) {
+        await reset(resetOther: true);
+        return;
+      }
       _parseAndUpdateUser(user);
+      final now = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+      await bind.mainSetLocalOption(key: 'rw-token-validated-at', value: now);
+      await bind.mainSetOption(key: 'rw-token-validated-at', value: now);
+      await bind.mainSetOption(key: 'rw-login-ok', value: 'Y');
     } catch (e) {
       debugPrint('Failed to refreshCurrentUser: $e');
-      // Surface failures in the address book / group tabs, which offer a
-      // retry. Anything not flagged above -- transport errors, non-JSON or
-      // unexpected-schema bodies (e.g. a filter's block page) -- keeps the
-      // check-your-network tip.
       if (networkError.value.isEmpty) {
         networkError.value = e.toString();
       }
+      if (!_withinOfflineGrace()) {
+        await reset(resetOther: true);
+      }
     } finally {
       refreshingUser = false;
-      await updateOtherModels();
+      if (isLogin) {
+        await updateOtherModels();
+      }
     }
   }
 
@@ -207,6 +239,8 @@ class UserModel {
       rethrow;
     }
     if (resp.statusCode != 200) {
+      // Disabled account: HTTP 400 {"error":"UserDisabled"} — gate translates
+      // this to «Аккаунт отключён администратором».
       throw RequestException(resp.statusCode, body['error'] ?? '');
     }
     if (body['error'] != null) {

@@ -820,6 +820,10 @@ fn core_main_invoke_new_connection(mut args: std::env::Args) -> Option<Vec<Strin
     if uni_links.is_empty() {
         return None;
     }
+    if !crate::login_gate::is_session_allowed() {
+        log::warn!("login-gate: ignoring --connect / URL scheme (not logged in)");
+        return Some(Vec::new());
+    }
 
     #[cfg(target_os = "linux")]
     return try_send_by_dbus(uni_links);
