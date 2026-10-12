@@ -3898,6 +3898,7 @@ class QualityMonitorModel with ChangeNotifier {
   QualityMonitorModel(this.parent);
   var _show = false;
   final _data = QualityMonitorData();
+  DateTime? lastUpdated;
 
   bool get show => _show;
   QualityMonitorData get data => _data;
@@ -3964,6 +3965,7 @@ class QualityMonitorModel with ChangeNotifier {
       if (evt.containsKey('chroma') && (evt['chroma'] as String).isNotEmpty) {
         _data.chroma = evt['chroma'];
       }
+      lastUpdated = DateTime.now();
       notifyListeners();
     } catch (e) {
       //

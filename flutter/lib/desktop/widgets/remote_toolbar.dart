@@ -19,6 +19,7 @@ import 'package:window_size/window_size.dart' as window_size;
 import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../models/model.dart';
+import '../../regway/quality_pill.dart';
 import 'dart:ui' show FontFeature;
 import '../../models/platform_model.dart';
 import '../../common/shared_state.dart';
@@ -805,6 +806,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       BuildContext context, _ToolbarEdge edge, bool isHorizontal) {
     final List<Widget> toolbarItems = [];
     toolbarItems.add(_SessionIdentity(id: widget.id, ffi: widget.ffi));
+    toolbarItems.add(RwQualityPill(ffi: widget.ffi));
     toolbarItems.add(_PinMenu(state: widget.state));
     toolbarItems.add(Obx(() {
       final privacyModeState = PrivacyModeState.find(widget.id);

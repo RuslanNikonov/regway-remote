@@ -17,7 +17,8 @@ bool refreshingUser = false;
 class UserModel {
   /// Must stay ≤ 60 s so a disable/delete in /_admin/ drops sessions in time.
   static const Duration authHeartbeat = Duration(seconds: 30);
-  static const int offlineGraceSecs = 24 * 60 * 60;
+  static const Duration authHeartbeatOffline = Duration(seconds: 10);
+  static const int confirmTtlSecs = 60;
 
   final RxString userName = ''.obs;
   final RxString displayName = ''.obs;
@@ -44,6 +45,7 @@ class UserModel {
 
   WeakReference<FFI> parent;
   Timer? _authHeartbeat;
+  bool _offlinePoll = false;
 
   UserModel(this.parent) {
     userName.listen((p0) {
@@ -53,18 +55,24 @@ class UserModel {
       //  For login success, should clear network error
       networkError.value = '';
     });
+    _armHeartbeat();
+  }
+
+  void _armHeartbeat() {
     _authHeartbeat?.cancel();
-    _authHeartbeat = Timer.periodic(authHeartbeat, (_) {
-      refreshCurrentUser();
+    final d = _offlinePoll ? authHeartbeatOffline : authHeartbeat;
+    _authHeartbeat = Timer(d, () async {
+      await refreshCurrentUser();
+      _armHeartbeat();
     });
   }
 
-  bool _withinOfflineGrace() {
+  bool _withinConfirmTtl() {
     final raw = bind.mainGetLocalOption(key: 'rw-token-validated-at');
     final ts = int.tryParse(raw);
     if (ts == null || ts <= 0) return false;
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    return now - ts < offlineGraceSecs;
+    return now - ts < confirmTtlSecs;
   }
 
   void refreshCurrentUser() async {
@@ -98,12 +106,12 @@ class UserModel {
             },
             body: json.encode(body));
       } catch (e) {
-        // Network error is not a 401. Keep the 24 h offline grace.
+        // Network timeout is not a 401. Keep the token (no re-login).
         debugPrint('login-gate: currentUser unreachable (network error, not 401): $e');
         networkError.value = e.toString();
-        await _setApiReachable(false);
-        if (!_withinOfflineGrace()) {
-          await reset(resetOther: true);
+        _offlinePoll = true;
+        if (!_withinConfirmTtl()) {
+          await _setApiReachable(false);
         }
         return;
       }
@@ -130,15 +138,16 @@ class UserModel {
       await bind.mainSetLocalOption(key: 'rw-token-validated-at', value: now);
       await bind.mainSetOption(key: 'rw-token-validated-at', value: now);
       await bind.mainSetOption(key: 'rw-login-ok', value: 'Y');
+      _offlinePoll = false;
       await _setApiReachable(true);
     } catch (e) {
       debugPrint('Failed to refreshCurrentUser: $e');
       if (networkError.value.isEmpty) {
         networkError.value = e.toString();
       }
-      await _setApiReachable(false);
-      if (!_withinOfflineGrace()) {
-        await reset(resetOther: true);
+      _offlinePoll = true;
+      if (!_withinConfirmTtl()) {
+        await _setApiReachable(false);
       }
     } finally {
       refreshingUser = false;
