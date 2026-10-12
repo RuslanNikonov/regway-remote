@@ -60,6 +60,7 @@ need src/hbbs_http/sync.rs 'Ok((401, _)) if !token.is_empty() => {' "heartbeat: 
 need src/hbbs_http/sync.rs 'fn regway_revoke_sessions(token: &str)' "heartbeat: закрытие входящих сеансов + сброс токена"
 need src/login_gate.rs 'pub const CHECK_INTERVAL: Duration = Duration::from_secs(30);' "login-gate: 30s token heartbeat"
 need src/login_gate.rs 'pub const OFFLINE_GRACE: Duration = Duration::from_secs(24 * 60 * 60);' "login-gate: 24h offline grace"
+need src/login_gate.rs 'log, tokio, ResultType,' "login-gate: tokio via hbb_common (not a crate dep)"
 need src/login_gate.rs 'pub fn decide_auth_check(status: Option<u16>, body: &str) -> AuthCheckOutcome' "login-gate: 401 revoke / network grace"
 need src/login_gate.rs 'fn http_401_unauthorized_revokes' "login-gate: unit test 401 → revoke"
 need src/login_gate.rs 'fn network_error_uses_grace_not_revoke' "login-gate: unit test network error → grace"
