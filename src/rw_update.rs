@@ -241,12 +241,15 @@ pub fn range_header(offset: u64, end_inclusive: u64) -> String {
 /// Chunks are at most 16 KiB. Partial dest files are resumed. `max_size` is
 /// enforced as bytes arrive so a too-large manifest is rejected before the
 /// signature is inspected. Does not load the whole object into memory.
-pub async fn range_fetch(
+pub async fn range_fetch<F>(
     url: &str,
     dest: &std::path::Path,
     max_size: Option<u64>,
-    mut on_progress: impl FnMut(u64, Option<u64>),
-) -> ResultType<u64> {
+    mut on_progress: F,
+) -> ResultType<u64>
+where
+    F: FnMut(u64, Option<u64>),
+{
     let client = crate::hbbs_http::create_http_client_async_with_url_strict(url).await?;
     let mut have = dest.metadata().map(|m| m.len()).unwrap_or(0);
     if let Some(max) = max_size {
@@ -311,13 +314,13 @@ pub async fn range_fetch(
         }
         // Server ignored Range and sent the whole object: keep only the
         // requested window so we never accept a single full-file GET.
-        let take = if status == 200 && bytes.len() as u64 > span {
+        let take = if status == 200 && (bytes.len() as u64) > span {
             bytes.len().min(span as usize)
         } else {
             bytes.len()
         };
         let chunk = &bytes[..take];
-        let next = offset + chunk.len() as u64;
+        let next = offset + (chunk.len() as u64);
         if let Some(max) = max_size {
             if next > max {
                 let _ = fs::remove_file(dest);
@@ -329,11 +332,11 @@ pub async fn range_fetch(
         on_progress(offset, known_total);
         if status == 200 && known_total.is_none() {
             // 200 with a Range-sized (or smaller) body: that was the rest.
-            if take as u64 <= span {
+            if (take as u64) <= span {
                 break;
             }
         }
-        if chunk.len() as u64 < span {
+        if (chunk.len() as u64) < span {
             break;
         }
     }
@@ -357,7 +360,7 @@ pub async fn range_get(
     range_fetch(url, dest, max_size, |_, _| {}).await?;
     let data = fs::read(dest)?;
     if let Some(max) = max_size {
-        if data.len() as u64 > max {
+        if (data.len() as u64) > max {
             let _ = fs::remove_file(dest);
             bail!("object exceeds {} bytes", max);
         }
