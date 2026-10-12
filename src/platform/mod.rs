@@ -33,7 +33,7 @@ use hbb_common::sysinfo::System;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use hbb_common::{sysinfo::Pid, ResultType};
 use std::sync::{Arc, Mutex};
-#[cfg(not(any(target_os = "macos", target_os = "android", target_os = "ios")))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub const SERVICE_INTERVAL: u64 = 300;
 
 lazy_static::lazy_static! {

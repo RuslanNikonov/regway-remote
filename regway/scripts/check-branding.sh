@@ -95,6 +95,8 @@ need flutter/lib/models/user_model.dart 'static const int confirmTtlSecs = 60;' 
 need src/login_gate.rs 'pub const API_REACHABLE: &str = "rw-api-reachable";' "login-gate: rw-api-reachable Y/N"
 need src/login_gate.rs 'fn timeout_does_not_revoke()' "login-gate: unit test timeout → grace, not revoke"
 need src/platform/macos.rs 'pub fn ensure_server_after_login()' "macOS: start --server after login"
+need src/platform/macos.rs 'std::time::Duration::from_millis(super::SERVICE_INTERVAL)' "macOS --server watchdog uses SERVICE_INTERVAL"
+need flutter/lib/models/user_model.dart 'Future<void> refreshCurrentUser() async' "login-gate: refreshCurrentUser is awaitable (not void)"
 need src/platform/privileges_scripts/install.scpt 'launchctl kickstart -k system/' "macOS install: kickstart -k replaces old root service"
 need flutter/lib/regway/login_view.dart 'class RwLoginPage extends StatelessWidget' "login-gate: full-window Flutter gate"
 need flutter/lib/regway/widgets.dart 'bg = hover && enabled ? p.dangerHover : p.danger' "redesign: solid danger disconnect"

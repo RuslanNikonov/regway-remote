@@ -75,7 +75,7 @@ class UserModel {
     return now - ts < confirmTtlSecs;
   }
 
-  void refreshCurrentUser() async {
+  Future<void> refreshCurrentUser() async {
     if (bind.isDisableAccount()) return;
     networkError.value = '';
     networkErrorFromServer.value = false;
