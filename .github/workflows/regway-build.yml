@@ -484,3 +484,49 @@ jobs:
           name: RegWayRemote-macos-${{ matrix.job.arch }}
           path: out/*
           if-no-files-found: error
+
+  # Candidate manifest: must sign. Missing UPDATE_SIGNING_KEY fails this job.
+  sign-update-manifest:
+    needs: [build-windows-x64, build-macos]
+    runs-on: ubuntu-22.04
+    env:
+      UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+      UPDATE_SEQUENCE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          path: rustdesk
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: RegWayRemote-*
+          path: artifacts
+          merge-multiple: true
+      - name: Sign update manifest
+        working-directory: rustdesk
+        run: |
+          set -euo pipefail
+          # Fail this candidate-manifest job if the signing secret is missing.
+          # Do not skip. Never print UPDATE_SIGNING_KEY.
+          if [ -z "${UPDATE_SIGNING_KEY:-}" ]; then
+            echo "FAIL UPDATE_SIGNING_KEY is not set" >&2
+            exit 1
+          fi
+          python3 -m pip install --user cryptography
+          mkdir -p ../updates-out
+          python3 ./regway/scripts/sign-update-manifest.py ../artifacts ../updates-out
+          test -s ../updates-out/manifest.json
+          test -s ../updates-out/manifest.json.sig
+          echo "===== updates-out sha256sum ====="
+          (cd ../updates-out && sha256sum -- manifest.json manifest.json.sig)
+          echo "===== manifest.json (public) ====="
+          cat ../updates-out/manifest.json
+          echo "===== manifest.json.sig (public) ====="
+          cat ../updates-out/manifest.json.sig
+          echo "OK signed manifest.json (job)"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: RegWayRemote-updates
+          path: |
+            updates-out/manifest.json
+            updates-out/manifest.json.sig
+          if-no-files-found: error

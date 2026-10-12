@@ -114,8 +114,7 @@ sub(cfg, r'pub static ref ORG: RwLock<String> = RwLock::new\("[^"]*"\.to_owned\(
 def map_init(pairs):
     items = ", ".join(f'("{q(k)}".to_owned(), "{q(v)}".to_owned())' for k, v in pairs)
     return f"RwLock::new(HashMap::from([{items}]))"
-ow = [("custom-rendezvous-server", ID), ("relay-server", RELAY), ("api-server", API), ("key", KEY),
-      ("allow-auto-update", "N")]
+ow = [("custom-rendezvous-server", ID), ("relay-server", RELAY), ("api-server", API), ("key", KEY)]
 sub(cfg, r'pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = [^\n]*$',
     f'pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = {map_init(ow)}; // RegWay', regex=True)
 sub(cfg, r'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = (?:Default::default\(\)|[^\n]*)$',

@@ -26,6 +26,8 @@ import '../../common/widgets/dialog.dart';
 import '../../common/widgets/login.dart';
 import 'package:flutter_hbb/regway/nav.dart';
 import 'package:flutter_hbb/regway/theme.dart';
+import 'package:flutter_hbb/regway/tips.dart';
+import 'package:flutter_hbb/regway/updates.dart';
 import 'package:flutter_hbb/regway/widgets.dart';
 
 const double _kTabWidth = 200;
@@ -58,6 +60,7 @@ enum SettingsTabKey {
   display,
   account,
   printer,
+  updates,
   about,
 }
 
@@ -81,6 +84,7 @@ class DesktopSettingPage extends StatefulWidget {
         !bind.isDisableSettings() &&
         bind.mainGetBuildinOption(key: kOptionHideRemotePrinterSetting) != 'Y')
       SettingsTabKey.printer,
+    SettingsTabKey.updates,
     SettingsTabKey.about,
   ];
 
@@ -219,6 +223,10 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           settingTabs
               .add(_TabInfo(tab, 'Printer', Icons.print_outlined, Icons.print));
           break;
+        case SettingsTabKey.updates:
+          settingTabs.add(_TabInfo(
+              tab, 'Updates', Icons.system_update_alt_outlined, Icons.system_update_alt));
+          break;
         case SettingsTabKey.about:
           settingTabs
               .add(_TabInfo(tab, 'About', Icons.info_outline, Icons.info));
@@ -249,6 +257,9 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           break;
         case SettingsTabKey.printer:
           children.add(const _Printer());
+          break;
+        case SettingsTabKey.updates:
+          children.add(const RwUpdatesPage());
           break;
         case SettingsTabKey.about:
           children.add(const _About());
@@ -1416,25 +1427,15 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
               initialKey: modeInitialKey,
               onChanged: (key) => model.setApproveMode(key),
             ).marginOnly(left: _kContentHMargin),
-            if (usePassword) radios[0],
             if (usePassword)
-              _SubLabeledWidget(
-                  context,
-                  'One-time password length',
-                  Row(
-                    children: [
-                      ...lengthRadios,
-                    ],
-                  ),
-                  enabled: tmpEnabled && !locked),
-            if (usePassword) numericOneTimePassword,
-            if (usePassword) radios[1],
+              Padding(
+                padding: const EdgeInsets.only(
+                    left: _kContentHMargin, top: 8, bottom: 4),
+                child: Text(translate('Use permanent password'),
+                    style: const TextStyle(fontSize: _kContentFontSize)),
+              ),
             if (usePassword && !isChangePermanentPasswordDisabled())
-              _SubButton('Set permanent password', setPasswordDialog,
-                  permEnabled && !locked),
-            // if (usePassword)
-            //   hide_cm(!locked).marginOnly(left: _kContentHSubMargin - 6),
-            if (usePassword) radios[2],
+              _SubButton('Set permanent password', setPasswordDialog, !locked),
           ]);
         })));
   }
@@ -1841,26 +1842,22 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
       final titleWidget = showTooltip
           ? Row(
               children: [
-                Tooltip(
-                  waitDuration: Duration(milliseconds: 1000),
+                Text(
+                  translate(title),
+                  style: TextStyle(fontSize: _kContentFontSize),
+                ),
+                SizedBox(width: 5),
+                RwTip(
                   message: translate(tooltipMessage),
-                  child: Row(
-                    children: [
-                      Text(
-                        translate(title),
-                        style: TextStyle(fontSize: _kContentFontSize),
-                      ),
-                      SizedBox(width: 5),
-                      Icon(
-                        Icons.help_outline,
-                        size: 14,
-                        color: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.color
-                            ?.withOpacity(0.7),
-                      ),
-                    ],
+                  focus: true,
+                  child: Icon(
+                    Icons.help_outline,
+                    size: 14,
+                    color: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.color
+                        ?.withOpacity(0.7),
                   ),
                 ),
               ],

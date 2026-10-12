@@ -7,6 +7,7 @@ import '../models/platform_model.dart';
 import '../models/user_model.dart';
 import 'nav.dart';
 import 'theme.dart';
+import 'updates.dart';
 import 'widgets.dart';
 
 class RwMetrics {
@@ -175,12 +176,13 @@ class RwSidebar extends StatelessWidget {
             onTap: () => onNav(RwNavId.history),
           ),
           if (!bind.isDisableSettings())
-            _NavItem(
+            Obx(() => _NavItem(
               icon: Icons.settings_outlined,
               label: translate('Settings'),
               selected: nav == RwNavId.settings,
               onTap: () => onNav(RwNavId.settings),
-            ),
+              badge: RwUpdates.badge.value,
+            )),
           const Spacer(),
           const _ProfileTile(),
         ],
@@ -247,11 +249,13 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final bool badge;
   const _NavItem({
     required this.icon,
     required this.label,
     required this.selected,
     required this.onTap,
+    this.badge = false,
   });
 
   @override
@@ -288,6 +292,17 @@ class _NavItem extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (badge) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: p.accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

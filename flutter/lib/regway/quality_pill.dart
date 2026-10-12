@@ -11,6 +11,7 @@ import '../common/shared_state.dart';
 import '../consts.dart';
 import '../models/model.dart';
 import 'theme.dart';
+import 'tips.dart';
 
 /// v3 quality pill: 3 bars + latency. Colour from delay only (≤80 green,
 /// 81–200 yellow, >200 red, grey if stale >3 s). Frame-loss is tooltip-only:
@@ -254,9 +255,10 @@ class _RwQualityPillState extends State<RwQualityPill> {
               lossLine,
               _routeLabel(),
             ].join('\n');
-            return Tooltip(
+            return RwTip(
               message: tip,
-              waitDuration: const Duration(milliseconds: 400),
+              click: true,
+              focus: true,
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

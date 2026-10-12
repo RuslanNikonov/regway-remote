@@ -227,7 +227,11 @@ impl FingerprintingInfo {
             addr: "0".repeat(16),
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             addr: {
-                let mut addr = default_net::get_mac().map(|m| m.addr).unwrap_or_default();
+                let mut addr = std::panic::catch_unwind(|| default_net::get_mac())
+                    .ok()
+                    .and_then(|r| r.ok())
+                    .map(|m| m.addr)
+                    .unwrap_or_default();
                 if addr.is_empty() {
                     addr = mac_address::get_mac_address()
                         .ok()

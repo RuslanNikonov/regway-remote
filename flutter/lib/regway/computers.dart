@@ -12,7 +12,10 @@ import '../consts.dart';
 import '../models/peer_model.dart';
 import '../models/platform_model.dart';
 import '../models/server_model.dart';
+import 'crash_banner.dart';
 import 'nav.dart';
+import 'preview.dart';
+import 'rename.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -40,6 +43,34 @@ String rwPlatformLabel(String platform) {
     default:
       return platform.trim().isEmpty ? '—' : platform;
   }
+}
+
+String rwFormatLastConn(Peer peer) {
+  var raw = peer.lastConnAt;
+  if (raw.isEmpty) {
+    try {
+      raw = bind.mainGetPeerOptionSync(id: peer.id, key: 'rw-last-conn-at');
+    } catch (_) {}
+  }
+  final ms = int.tryParse(raw.trim());
+  if (ms == null || ms <= 0) return '—';
+  final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+  two(int n) => n.toString().padLeft(2, '0');
+  return '${two(dt.day)}.${two(dt.month)}.${dt.year} ${two(dt.hour)}:${two(dt.minute)}';
+}
+
+String rwFormatDuration(Peer peer) {
+  var raw = peer.lastConnDuration;
+  if (raw.isEmpty) {
+    try {
+      raw = bind.mainGetPeerOptionSync(id: peer.id, key: 'rw-last-conn-dur');
+    } catch (_) {}
+  }
+  final sec = int.tryParse(raw.trim());
+  if (sec == null || sec < 0) return '—';
+  final d = Duration(seconds: sec);
+  two(int n) => n.toString().padLeft(2, '0');
+  return '${two(d.inHours)}:${two(d.inMinutes.remainder(60))}:${two(d.inSeconds.remainder(60))}';
 }
 
 LinearGradient rwWallpaper(Peer peer, [RwPalette? p]) {
@@ -171,6 +202,7 @@ class _RwComputersPageState extends State<RwComputersPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const RwCrashBanner(),
         if (widget.helpBanner != null) widget.helpBanner!,
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -257,20 +289,17 @@ class RwPeerCard extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: p.cardBorder),
-                gradient: rwWallpaper(peer, p),
               ),
-              alignment: Alignment.center,
-              child: online
-                  ? null
-                  : Icon(Icons.grid_view_rounded,
-                      size: 34, color: p.text.withOpacity(0.8)),
+              clipBehavior: Clip.antiAlias,
+              child: RwPeerPreview(peer: peer),
             ),
           ),
           const SizedBox(height: 9),
-          Text(rwPeerTitle(peer),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: p.textH3),
+          RwRenameName(
+            text: rwPeerTitle(peer),
+            style: p.textH3,
+            onSave: (next) => rwRenamePeer(peer, next),
+          ),
           const SizedBox(height: 6),
           RwStatusDot(
             online: online,
@@ -373,14 +402,11 @@ class RwRecentTable extends StatelessWidget {
               flex: 4,
               child: Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(6),
-                      gradient: rwWallpaper(peer, p),
-                      border: Border.all(color: p.cardBorder),
-                    ),
+                  RwPeerPreview(
+                    peer: peer,
+                    width: 36,
+                    height: 24,
+                    radius: 6,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -405,11 +431,13 @@ class RwRecentTable extends StatelessWidget {
             ),
             Expanded(
               flex: 3,
-              child: Text('—', style: p.textNumSm.copyWith(color: p.muted)),
+              child: Text(rwFormatLastConn(peer),
+                  style: p.textNumSm.copyWith(color: p.muted)),
             ),
             Expanded(
               flex: 2,
-              child: Text('—', style: p.textNumSm.copyWith(color: p.muted)),
+              child: Text(rwFormatDuration(peer),
+                  style: p.textNumSm.copyWith(color: p.muted)),
             ),
           ],
         ),
@@ -530,6 +558,7 @@ class _RwThisComputerState extends State<RwThisComputer> {
   Timer? _statusTimer;
   bool _usingPublic = true;
   bool _apiUnreachable = false;
+  String _ownName = '';
 
   RxBool get _svcStopped {
     if (Get.isRegistered<RxBool>(tag: 'stop-service')) {
@@ -546,6 +575,12 @@ class _RwThisComputerState extends State<RwThisComputer> {
   @override
   void initState() {
     super.initState();
+    try {
+      _ownName = bind.mainGetOptionSync(key: 'preset-device-name');
+      if (_ownName.isEmpty) {
+        _ownName = bind.mainGetCommonSync(key: 'hostname');
+      }
+    } catch (_) {}
     _refreshLocalFlags();
     _statusTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
       try {
@@ -590,7 +625,17 @@ class _RwThisComputerState extends State<RwThisComputer> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(translate('This computer'), style: p.textH2),
+                  RwRenameName(
+                    text: _ownName.isEmpty
+                        ? translate('This computer')
+                        : _ownName,
+                    style: p.textH2,
+                    onSave: (next) async {
+                      final ok = await rwRenameOwn(next);
+                      if (ok && mounted) setState(() => _ownName = next);
+                      return ok;
+                    },
+                  ),
                   const SizedBox(height: 14),
                   Text(translate('Your ID'), style: p.textLabel),
                   const SizedBox(height: 6),

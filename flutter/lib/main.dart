@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:bot_toast/bot_toast.dart';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
@@ -37,8 +38,29 @@ late List<String> kBootArgs;
 
 Future<void> main(List<String> args) async {
   earlyAssert();
-  WidgetsFlutterBinding.ensureInitialized();
+  await runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (details) {
+      _rwRecordCrash(details.exceptionAsString());
+      FlutterError.presentError(details);
+    };
+    ui.PlatformDispatcher.instance.onError = (error, stack) {
+      _rwRecordCrash('$error');
+      return true;
+    };
+    await _mainBody(args);
+  }, (error, stack) {
+    _rwRecordCrash('$error');
+  });
+}
 
+void _rwRecordCrash(String raw) {
+  try {
+    bind.mainSetCommon(key: 'rw-crash-log', value: raw);
+  } catch (_) {}
+}
+
+Future<void> _mainBody(List<String> args) async {
   debugPrint("launch args: $args");
   kBootArgs = List.from(args);
 

@@ -121,6 +121,7 @@ impl Drop for SimpleCallOnReturn {
 }
 
 pub fn global_init() -> bool {
+    crate::crash::install_hooks();
     #[cfg(all(target_os = "linux", feature = "drm"))]
     crate::platform::linux::dispatch_wayland_display_probe();
     #[cfg(target_os = "linux")]
@@ -910,6 +911,10 @@ pub fn username() -> String {
 #[inline(always)]
 #[cfg(not(target_os = "ios"))]
 pub fn whoami_hostname() -> String {
+    let preset = Config::get_option(keys::OPTION_PRESET_DEVICE_NAME);
+    if !preset.is_empty() {
+        return preset;
+    }
     let mut hostname = whoami::fallible::hostname().unwrap_or_else(|_| "localhost".to_string());
     hostname.make_ascii_lowercase();
     hostname

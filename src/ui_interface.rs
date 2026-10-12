@@ -671,19 +671,54 @@ pub fn set_permanent_password_with_result(password: String) -> bool {
     if config::Config::is_disable_change_permanent_password() {
         return false;
     }
-    #[cfg(any(target_os = "android", target_os = "ios"))]
-    {
-        return config::Config::set_permanent_password(&password);
-    }
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    {
-        match crate::ipc::set_permanent_password_with_ack(password) {
-            Ok(ok) => ok,
-            Err(err) => {
-                log::warn!("Failed to set permanent password via IPC: {err}");
-                false
+    let display = password.clone();
+    let ok = {
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        {
+            config::Config::set_permanent_password(&password)
+        }
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            match crate::ipc::set_permanent_password_with_ack(password) {
+                Ok(ok) => ok,
+                Err(err) => {
+                    log::warn!("Failed to set permanent password via IPC: {err}");
+                    false
+                }
             }
         }
+    };
+    if ok && !display.is_empty() {
+        store_permanent_password_display(&display);
+    }
+    ok
+}
+
+pub fn store_permanent_password_display(password: &str) {
+    let enc = hbb_common::password_security::encrypt_str_or_original(password, "00", 128);
+    LocalConfig::set_option("rw-perm-pw-display".to_owned(), enc);
+}
+
+pub fn load_permanent_password_display() -> String {
+    let enc = LocalConfig::get_option("rw-perm-pw-display");
+    if enc.is_empty() {
+        return String::new();
+    }
+    hbb_common::password_security::decrypt_str_or_original(&enc, "00").0
+}
+
+/// C8: unique CSPRNG permanent password per install; never logged.
+pub fn ensure_unique_permanent_password() {
+    Config::set_option(
+        "verification-method".to_owned(),
+        "use-permanent-password".to_owned(),
+    );
+    if Config::has_permanent_password() {
+        return;
+    }
+    let pw = Config::get_auto_password(12);
+    if Config::set_permanent_password(&pw) {
+        store_permanent_password_display(&pw);
     }
 }
 
@@ -818,6 +853,20 @@ pub fn peer_to_map(id: String, p: PeerConfig) -> HashMap<&'static str, String> {
         (
             "alias",
             p.options.get("alias").unwrap_or(&"".to_owned()).to_owned(),
+        ),
+        (
+            "last_conn_at",
+            p.options
+                .get("rw-last-conn-at")
+                .cloned()
+                .unwrap_or_default(),
+        ),
+        (
+            "last_conn_duration",
+            p.options
+                .get("rw-last-conn-dur")
+                .cloned()
+                .unwrap_or_default(),
         ),
         (
             "hash",

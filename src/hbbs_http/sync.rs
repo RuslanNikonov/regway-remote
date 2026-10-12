@@ -32,6 +32,11 @@ pub fn start() {
     let _sender = SENDER.lock().unwrap();
 }
 
+/// C4: after renaming this computer, drop the hash so the next heartbeat POSTs /api/sysinfo.
+pub fn force_sysinfo_upload() {
+    config::Status::set("sysinfo_hash", "".to_owned());
+}
+
 #[cfg(not(target_os = "ios"))]
 pub fn signal_receiver() -> broadcast::Receiver<Vec<i32>> {
     SENDER.lock().unwrap().subscribe()

@@ -43,6 +43,8 @@ import '../common/widgets/dialog.dart';
 import 'input_model.dart';
 import 'platform_model.dart';
 import 'package:flutter_hbb/utils/scale.dart';
+import 'package:flutter_hbb/regway/reconnect_overlay.dart';
+import 'package:flutter_hbb/regway/session_clock.dart';
 
 import 'package:flutter_hbb/generated_bridge.dart'
     if (dart.library.html) 'package:flutter_hbb/web/bridge.dart';
@@ -1109,6 +1111,7 @@ class FfiModel with ChangeNotifier {
 
   void reconnect(OverlayDialogManager dialogManager, SessionID sessionId,
       bool forceRelay) {
+    RwReconnect.begin();
     // Disable relative mouse mode before reconnecting to ensure cursor is released.
     parent.target?.inputModel.setRelativeMouseMode(false);
     _cancelPendingMonitorRestore();
@@ -3448,8 +3451,8 @@ class CursorModel with ChangeNotifier {
   }
 
   bool _isInCurrentWindow(double x, double y) {
-    final w = _windowRect!.width / devicePixelRatio;
-    final h = _windowRect!.width / devicePixelRatio;
+        final w = _windowRect!.width / devicePixelRatio;
+    final h = _windowRect!.height / devicePixelRatio;
     return x >= 0 && y >= 0 && x <= w && y <= h;
   }
 
@@ -4119,6 +4122,13 @@ class FFI {
     List<int>? displays,
   }) {
     closed = false;
+    RwSessionClock.markStart(id);
+    try {
+      bind.mainSetPeerOption(
+          id: id,
+          key: 'rw-last-conn-at',
+          value: '${DateTime.now().millisecondsSinceEpoch}');
+    } catch (_) {}
     if (isMobile) mobileReset();
     assert(
         (!(isPortForward && isViewCamera)) &&
@@ -4367,6 +4377,14 @@ class FFI {
 
   /// Close the remote session.
   Future<void> close({bool closeSession = true}) async {
+    final dur = RwSessionClock.end(id);
+    if (dur != null && id.isNotEmpty) {
+      try {
+        bind.mainSetPeerOption(
+            id: id, key: 'rw-last-conn-dur', value: '${dur.inSeconds}');
+      } catch (_) {}
+    }
+    RwReconnect.stop();
     closed = true;
     if (isWeb) {
       platformFFI.clearVideoFrameCallback();

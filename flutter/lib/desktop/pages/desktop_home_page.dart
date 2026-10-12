@@ -22,6 +22,7 @@ import 'package:flutter_hbb/regway/computers.dart';
 import 'package:flutter_hbb/regway/nav.dart';
 import 'package:flutter_hbb/regway/shell.dart';
 import 'package:flutter_hbb/regway/theme.dart';
+import 'package:flutter_hbb/regway/updates.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -736,6 +737,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     super.initState();
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
+      try {
+        final raw = bind.mainGetCommonSync(key: 'rw-update-status');
+        if (raw.isNotEmpty) {
+          final st = jsonDecode(raw);
+          if (st is Map<String, dynamic>) {
+            RwUpdates.ingest(st);
+          }
+        }
+      } catch (_) {}
       // Redesign dropped ConnectionPage's OnlineStatusWidget; keep svcStatus
       // in sync with the real rendezvous connect-status stream.
       try {

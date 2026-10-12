@@ -84,7 +84,8 @@ pub async fn discover() -> ResultType<()> {
 }
 
 pub fn send_wol(id: String) {
-    let interfaces = default_net::get_interfaces();
+    let interfaces = crate::crash::catch_net("get_interfaces", default_net::get_interfaces)
+        .unwrap_or_default();
     for peer in &config::LanPeers::load().peers {
         if peer.id == id {
             for (_, mac) in peer.ip_mac.iter() {
@@ -122,7 +123,9 @@ fn get_mac(_ip: &IpAddr) -> String {
 
 #[cfg(not(target_os = "ios"))]
 fn get_mac_by_ip(ip: &IpAddr) -> ResultType<String> {
-    for interface in default_net::get_interfaces() {
+    let interfaces =
+        crate::crash::catch_net("get_interfaces", default_net::get_interfaces).unwrap_or_default();
+    for interface in interfaces {
         match ip {
             IpAddr::V4(local_ipv4) => {
                 if interface.ipv4.iter().any(|x| x.addr == *local_ipv4) {
@@ -167,7 +170,9 @@ fn create_broadcast_sockets() -> Vec<UdpSocket> {
     // But currently, it's ok to use `[Ipv4Addr::UNSPECIFIED]` for discovery.
     // `default_net::get_interfaces()` causes undefined symbols error when `flutter build` on iOS simulator x86_64
     #[cfg(not(any(target_os = "ios")))]
-    for interface in default_net::get_interfaces() {
+    for interface in crate::crash::catch_net("get_interfaces", default_net::get_interfaces)
+        .unwrap_or_default()
+    {
         for ipv4 in &interface.ipv4 {
             ipv4s.push(ipv4.addr.clone());
         }

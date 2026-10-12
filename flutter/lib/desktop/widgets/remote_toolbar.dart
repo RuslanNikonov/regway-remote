@@ -20,6 +20,9 @@ import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../models/model.dart';
 import '../../regway/quality_pill.dart';
+import '../../regway/session_clock.dart';
+import '../../regway/session_icons.dart';
+import '../../regway/theme.dart';
 import 'dart:ui' show FontFeature;
 import '../../models/platform_model.dart';
 import '../../common/shared_state.dart';
@@ -1041,13 +1044,8 @@ class _MainMonitorSwitchButton extends StatelessWidget {
           child: Stack(
             alignment: const Alignment(0, -0.125),
             children: [
-              SvgPicture.asset(
-                'assets/display_switcher.svg',
-                colorFilter:
-                    const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                width: _ToolbarTheme.buttonSize,
-                height: _ToolbarTheme.buttonSize,
-              ),
+              rwSessionSvg('assets/display_switcher.svg',
+                  color: RwColors.onAccent),
               Text(
                 label,
                 textAlign: TextAlign.center,
@@ -1195,11 +1193,8 @@ class _MonitorMenu extends StatelessWidget {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        SvgPicture.asset(
-                          "assets/screen.svg",
-                          colorFilter:
-                              ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                        ),
+                        rwSessionSvg("assets/screen.svg",
+                            color: RwColors.onAccent),
                         Obx(() => buildOneMonitorButton(i, display.value)),
                       ],
                     ),
@@ -3033,13 +3028,12 @@ class _SessionIdentity extends StatefulWidget {
 }
 
 class _SessionIdentityState extends State<_SessionIdentity> {
-  late DateTime _started;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _started = DateTime.now();
+    RwSessionClock.markStart(widget.id);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -3052,9 +3046,8 @@ class _SessionIdentityState extends State<_SessionIdentity> {
   }
 
   String _elapsed() {
-    final d = DateTime.now().difference(_started);
-    two(int n) => n.toString().padLeft(2, '0');
-    return '${two(d.inHours)}:${two(d.inMinutes.remainder(60))}:${two(d.inSeconds.remainder(60))}';
+    final d = RwSessionClock.elapsed(widget.id) ?? Duration.zero;
+    return RwSessionClock.format(d);
   }
 
   @override
@@ -3151,11 +3144,12 @@ class _IconMenuButtonState extends State<_IconMenuButton> {
   Widget build(BuildContext context) {
     assert(widget.assetName != null || widget.icon != null);
     final icon = widget.icon ??
-        SvgPicture.asset(
-          widget.assetName!,
-          colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
-          width: _ToolbarTheme.buttonSize,
-          height: _ToolbarTheme.buttonSize,
+        Center(
+          child: rwSessionSvg(
+            widget.assetName!,
+            color: RwColors.onAccent,
+            size: kRwSessionIconSize,
+          ),
         );
     var button = SizedBox(
       width: widget.width ?? _ToolbarTheme.buttonSize,
@@ -3236,11 +3230,12 @@ class _IconSubmenuButtonState extends State<_IconSubmenuButton> {
   Widget build(BuildContext context) {
     assert(widget.svg != null || widget.icon != null);
     final icon = widget.icon ??
-        SvgPicture.asset(
-          widget.svg!,
-          colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
-          width: _ToolbarTheme.buttonSize,
-          height: _ToolbarTheme.buttonSize,
+        Center(
+          child: rwSessionSvg(
+            widget.svg!,
+            color: RwColors.onAccent,
+            size: kRwSessionIconSize,
+          ),
         );
     final button = SizedBox(
         width: widget.width ?? _ToolbarTheme.buttonSize,
@@ -3889,13 +3884,8 @@ class _MinimizedMonitorSwitchButton extends StatelessWidget {
           child: Stack(
             alignment: const Alignment(0, -0.125),
             children: [
-              SvgPicture.asset(
-                'assets/display_switcher.svg',
-                colorFilter:
-                    ColorFilter.mode(_ToolbarTheme.blueColor, BlendMode.srcIn),
-                width: iconSize,
-                height: iconSize,
-              ),
+              rwSessionSvg('assets/display_switcher.svg',
+                  color: RwColors.onAccent, size: iconSize),
               Text(
                 label,
                 style: const TextStyle(

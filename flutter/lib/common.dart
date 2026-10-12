@@ -4094,6 +4094,9 @@ void earlyAssert() {
 }
 
 void checkUpdate() {
+  try {
+    bind.mainSetCommon(key: 'rw-update-check', value: '1');
+  } catch (_) {}
   if (!isWeb) {
     if (!bind.isCustomClient()) {
       platformFFI.registerEventHandler(

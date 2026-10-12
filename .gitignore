@@ -85,3 +85,5 @@ id_dsa
 !res/regway/*.png
 !regway/branding/design/icon/png/
 !libs/portable/src/res/*.png
+!flutter/assets/session/*.svg
+!regway/branding/design/icons/session/*.svg
