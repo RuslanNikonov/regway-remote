@@ -12,14 +12,12 @@ import '../consts.dart';
 import '../models/model.dart';
 import 'theme.dart';
 
-/// v3 quality pill: 3 bars + latency, delay + loss bands, 3 s average,
-/// 3 s stale, 2 s color hold. Reads QualityStatus / test_delay / speed already
-/// pushed to Flutter — no extra probes. Packet loss is fps vs session peak
-/// fps (QualityStatus has no native loss field).
+/// v3 quality pill: 3 bars + latency. Colour from delay only (≤80 green,
+/// 81–200 yellow, >200 red, grey if stale >3 s). Frame-loss is tooltip-only:
+/// RustDesk sends no frames on a still screen, so fps must not drive colour.
+/// Reads QualityStatus / test_delay / speed already pushed to Flutter.
 const double kRwQualityDelayGoodMs = 80;
 const double kRwQualityDelayBadMs = 200;
-const double kRwQualityLossGoodPct = 1;
-const double kRwQualityLossBadPct = 5;
 const Duration kRwQualityAvgWindow = Duration(seconds: 3);
 const Duration kRwQualityStaleAfter = Duration(seconds: 3);
 const Duration kRwQualityColorHold = Duration(seconds: 2);
@@ -33,37 +31,11 @@ class RwQualityView {
   const RwQualityView({required this.band, this.delayMs, this.lossPct});
 }
 
-/// Green: ≤80 ms and ≤1% loss. Yellow: 81–200 ms or 1–5% loss.
-/// Red: >200 ms or >5% loss. Worse of the two metrics wins.
-RwQualityBand rwQualityBand({double? delayMs, double? lossPct}) {
-  var band = RwQualityBand.good;
-  var any = false;
-  if (delayMs != null) {
-    any = true;
-    if (delayMs > kRwQualityDelayBadMs) {
-      band = RwQualityBand.bad;
-    } else if (delayMs > kRwQualityDelayGoodMs) {
-      band = RwQualityBand.warn;
-    }
-  }
-  if (lossPct != null) {
-    any = true;
-    if (lossPct > kRwQualityLossBadPct) {
-      band = _worse(band, RwQualityBand.bad);
-    } else if (lossPct > kRwQualityLossGoodPct) {
-      band = _worse(band, RwQualityBand.warn);
-    }
-  }
-  return any ? band : RwQualityBand.none;
-}
-
-RwQualityBand _worse(RwQualityBand a, RwQualityBand b) {
-  if (a == RwQualityBand.bad || b == RwQualityBand.bad) {
-    return RwQualityBand.bad;
-  }
-  if (a == RwQualityBand.warn || b == RwQualityBand.warn) {
-    return RwQualityBand.warn;
-  }
+/// Green: ≤80 ms. Yellow: 81–200 ms. Red: >200 ms. Frame-loss is ignored.
+RwQualityBand rwQualityBand({double? delayMs}) {
+  if (delayMs == null) return RwQualityBand.none;
+  if (delayMs > kRwQualityDelayBadMs) return RwQualityBand.bad;
+  if (delayMs > kRwQualityDelayGoodMs) return RwQualityBand.warn;
   return RwQualityBand.good;
 }
 
@@ -74,7 +46,7 @@ class _Samp {
   const _Samp(this.at, this.delayMs, this.fps);
 }
 
-/// Rolling 3 s average of delay / frame-loss (from QualityStatus fps);
+/// Rolling 3 s average of delay (colour) and fps-derived frame-loss (tooltip);
 /// colour steps at most once per 2 s.
 class RwQualityTracker {
   final _samples = <_Samp>[];
@@ -118,7 +90,7 @@ class RwQualityTracker {
     final lossPct = (avgFps == null || _peakFps <= 0)
         ? null
         : (100.0 * (1.0 - (avgFps / _peakFps)).clamp(0.0, 1.0));
-    final band = rwQualityBand(delayMs: avgDelay, lossPct: lossPct);
+    final band = rwQualityBand(delayMs: avgDelay);
     if (_shown != RwQualityBand.none &&
         band != _shown &&
         band != RwQualityBand.none &&

@@ -10,18 +10,19 @@ void main() {
     expect(rwQualityBand(delayMs: 201), RwQualityBand.bad);
   });
 
-  test('loss: green ≤1%, yellow 1–5%, red >5%', () {
-    expect(rwQualityBand(delayMs: 40, lossPct: 0.5), RwQualityBand.good);
-    expect(rwQualityBand(delayMs: 40, lossPct: 1), RwQualityBand.good);
-    expect(rwQualityBand(delayMs: 40, lossPct: 1.1), RwQualityBand.warn);
-    expect(rwQualityBand(delayMs: 40, lossPct: 5), RwQualityBand.warn);
-    expect(rwQualityBand(delayMs: 40, lossPct: 5.1), RwQualityBand.bad);
-  });
-
-  test('worse of delay and loss wins', () {
-    expect(rwQualityBand(delayMs: 250, lossPct: 0), RwQualityBand.bad);
-    expect(rwQualityBand(delayMs: 40, lossPct: 9), RwQualityBand.bad);
-    expect(rwQualityBand(delayMs: 120, lossPct: 0.2), RwQualityBand.warn);
+  test('frame loss does not affect colour', () {
+    final tracker = RwQualityTracker();
+    final t0 = DateTime.utc(2026, 1, 1, 12);
+    expect(
+      tracker.update(now: t0, eventAt: t0, delayMs: 40, fps: 30).band,
+      RwQualityBand.good,
+    );
+    final t1 = t0.add(const Duration(seconds: 1));
+    final view =
+        tracker.update(now: t1, eventAt: t1, delayMs: 40, fps: 0);
+    expect(view.lossPct, isNotNull);
+    expect(view.lossPct! > 1, isTrue);
+    expect(view.band, RwQualityBand.good);
   });
 
   test('3 bars: good 3, warn 2, bad 1, none 0', () {
