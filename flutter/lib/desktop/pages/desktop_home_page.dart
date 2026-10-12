@@ -581,8 +581,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             () async {},
             marginTop: LinuxCards.isEmpty ? 20.0 : 5.0,
             help: 'Help',
-            link:
-                'https://remote.regway.group',
+            link: translate("doc_fix_wayland"),
             closeButton: true,
             closeOption: keyShowSelinuxHelpTip,
           ));
@@ -593,13 +592,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             "Warning", "wayland_experiment_tip", "", () async {},
             marginTop: LinuxCards.isEmpty ? 20.0 : 5.0,
             help: 'Help',
-            link: 'https://remote.regway.group'));
+            link: translate("doc_fix_wayland")));
       } else if (bind.mainIsLoginWayland()) {
         LinuxCards.add(buildInstallCard("Warning",
             "Login screen using Wayland is not supported", "", () async {},
             marginTop: LinuxCards.isEmpty ? 20.0 : 5.0,
             help: 'Help',
-            link: 'https://remote.regway.group'));
+            link: translate("doc_fix_wayland")));
       }
       if (LinuxCards.isNotEmpty) {
         return Column(

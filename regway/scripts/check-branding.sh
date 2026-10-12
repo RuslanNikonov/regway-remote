@@ -105,6 +105,17 @@ need flutter/lib/regway/theme.dart 'danger: Color(0xFFD41E48),' "v2 light Отк
 need flutter/lib/desktop/pages/desktop_setting_page.dart "// Theme: Системная / Тёмная / Светлая (system, dark, light)" "theme radios: system / dark / light"
 need src/lang/ru.rs '("UserDisabled", "Аккаунт отключён администратором"),' "login-gate: UserDisabled ru"
 need src/lang/en.rs '("UserDisabled", "Account disabled by administrator"),' "login-gate: UserDisabled en"
+need src/lang/en.rs '("doc_mac_permission", "https://remote.regway.group/help/"),' "Help/Помощь: mac docs → /help/, not /_admin/"
+need src/lang/en.rs '("doc_fix_wayland", "https://remote.regway.group/help/"),' "Help/Помощь: wayland docs → /help/, not /_admin/"
+need libs/hbb_common/src/config.rs 'pub const LINK_DOCS_HOME: &str = "https://remote.regway.group/help/";' "Help/Помощь: LINK_DOCS_HOME → /help/"
+need src/client.rs 'pub const SCRAP_X11_REF_URL: &str = "https://remote.regway.group/help/";' "Help/Помощь: X11 ref → /help/"
+need flutter/lib/desktop/pages/desktop_home_page.dart 'link: translate("doc_fix_wayland")' "Help/Помощь: Linux cards use /help/ docs, not API root"
+need regway/branding.env 'HELP_URL=https://remote.regway.group/help/' "Help/Помощь: HELP_URL is /help/"
+if rg -n '_admin' src/lang/en.rs libs/hbb_common/src/config.rs src/client.rs | rg -e 'doc_mac_permission|doc_fix_wayland|LINK_DOCS|SCRAP_X11_REF' >/dev/null; then
+  echo "FAIL Help/Помощь still points at /_admin/"; fail=1
+else
+  echo "OK   Help/Помощь does not point at /_admin/"
+fi
 need flutter/lib/common.dart "if (name == 'RegWayRemote') return 'RegWay Remote';" "window title uses display name"
 need src/tray.rs '"RegWay Remote".to_owned()' "tray tooltip uses display name"
 need flutter/macos/Runner/Info.plist "<string>RegWay Remote</string>" "macOS CFBundleDisplayName"
