@@ -1696,7 +1696,7 @@ impl Connection {
                 match crate::post_request_with_status(url.clone(), body.clone(), "").await {
                     Ok((status, text)) => {
                         if (200..300).contains(&status) {
-                            match audit_2xx_as_success(&text) {
+                            match Self::audit_2xx_as_success(&text) {
                                 Ok(()) => return Ok(text),
                                 Err((retryable, err)) => (retryable, err),
                             }
