@@ -40,14 +40,11 @@ pub fn temporary_password() -> String {
 }
 
 fn verification_method() -> VerificationMethod {
-    let method = Config::get_option("verification-method");
-    if method == "use-temporary-password" {
-        VerificationMethod::OnlyUseTemporaryPassword
-    } else if method == "use-permanent-password" {
-        VerificationMethod::OnlyUsePermanentPassword
-    } else {
-        VerificationMethod::UseBothPasswords // default
-    }
+    // C8: only the permanent password is accepted. Temporary / one-time
+    // passwords stay in the binary for upstream compatibility but are never
+    // offered or checked.
+    let _ = Config::get_option("verification-method");
+    VerificationMethod::OnlyUsePermanentPassword
 }
 
 pub fn temporary_password_length() -> usize {

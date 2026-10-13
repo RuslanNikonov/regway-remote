@@ -74,7 +74,7 @@ lazy_static::lazy_static! {
     static ref USER_DEFAULT_CONFIG: RwLock<(UserDefaultConfig, Instant)> = RwLock::new((UserDefaultConfig::load(), Instant::now()));
     pub static ref NEW_STORED_PEER_CONFIG: Mutex<HashSet<String>> = Default::default();
     pub static ref DEFAULT_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
-    pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("custom-rendezvous-server".to_owned(), "remote.regway.group".to_owned()), ("relay-server".to_owned(), "remote.regway.group:21117".to_owned()), ("api-server".to_owned(), "https://remote.regway.group".to_owned()), ("key".to_owned(), "REPLACE_WITH_CONTENT_OF_id_ed25519.pub".to_owned()), ("allow-auto-update".to_owned(), "N".to_owned())])); // RegWay
+    pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([("custom-rendezvous-server".to_owned(), "remote.regway.group".to_owned()), ("relay-server".to_owned(), "remote.regway.group:21117".to_owned()), ("api-server".to_owned(), "https://remote.regway.group".to_owned()), ("key".to_owned(), "REPLACE_WITH_CONTENT_OF_id_ed25519.pub".to_owned())])); // RegWay
     pub static ref DEFAULT_DISPLAY_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
     pub static ref OVERWRITE_DISPLAY_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
     pub static ref DEFAULT_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
@@ -2362,7 +2362,8 @@ impl UserDefaultConfig {
             #[cfg(any(target_os = "android", target_os = "ios"))]
             keys::OPTION_VIEW_STYLE => self.get_string(key, "adaptive", vec!["original"]),
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            keys::OPTION_VIEW_STYLE => self.get_string(key, "original", vec!["adaptive"]),
+            // C7: fit the remote display in the window (aspect ratio, no extra black bars).
+            keys::OPTION_VIEW_STYLE => self.get_string(key, "adaptive", vec!["original"]),
             keys::OPTION_SCROLL_STYLE => {
                 self.get_string(key, "scrollauto", vec!["scrolledge", "scrollbar"])
             }

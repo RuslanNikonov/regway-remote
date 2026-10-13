@@ -18,6 +18,11 @@ import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/platform_channel.dart';
+import 'package:flutter_hbb/regway/computers.dart';
+import 'package:flutter_hbb/regway/nav.dart';
+import 'package:flutter_hbb/regway/shell.dart';
+import 'package:flutter_hbb/regway/theme.dart';
+import 'package:flutter_hbb/regway/updates.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -58,16 +63,66 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final isIncomingOnly = bind.isIncomingOnly();
     return _buildBlock(
-        child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        buildLeftPane(context),
-        if (!isIncomingOnly) const VerticalDivider(width: 1),
-        if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
-      ],
-    ));
+      child: Obx(() {
+        final nav = RwNav.selected.value;
+        if (bind.isIncomingOnly()) {
+          return RwShell(
+            nav: nav,
+            onNav: (id) {
+              if (id == RwNavId.settings) {
+                DesktopTabPage.onAddSetting();
+              } else {
+                RwNav.go(id);
+              }
+            },
+            child: const RwThisComputer(),
+          );
+        }
+        Widget body;
+        Widget? rail;
+        switch (nav) {
+          case RwNavId.computers:
+            body = RwComputersPage(helpBanner: _rwHelpBanner());
+            rail = const RwRightRail();
+            break;
+          case RwNavId.connections:
+            body = const RwConnectionsPage();
+            break;
+          case RwNavId.history:
+            body = const RwHistoryPage();
+            break;
+          case RwNavId.settings:
+            body = DesktopSettingPage(
+              key: const ValueKey(kTabLabelSettingPage),
+              initialTabkey: SettingsTabKey.general,
+            );
+            break;
+        }
+        return RwShell(
+          nav: nav,
+          onNav: (id) => RwNav.go(id),
+          child: body,
+          rail: rail,
+        );
+      }),
+    );
+  }
+
+  Widget? _rwHelpBanner() {
+    return FutureBuilder<Widget>(
+      future: Future.value(
+          Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
+      builder: (_, data) {
+        if (data.hasData && data.data is! Container) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: data.data!,
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
   }
 
   Widget _buildBlock({required Widget child}) {
@@ -597,21 +652,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     }
 
+    final pal = rwOf(context);
     return Stack(
       children: [
         Container(
           margin: EdgeInsets.fromLTRB(
               0, marginTop, 0, bind.isIncomingOnly() ? marginTop : 0),
           child: Container(
-              decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Color.fromARGB(255, 226, 66, 188),
-                  Color.fromARGB(255, 244, 114, 124),
-                ],
-              )),
+              decoration: RwDecor.panelOf(pal),
               padding: EdgeInsets.all(20),
               child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -621,10 +669,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                               Center(
                                   child: Text(
                                 translate(title),
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15),
+                                style: pal.textH2,
                               ).marginOnly(bottom: 6)),
                             ]
                           : <Widget>[]) +
@@ -632,11 +677,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                         if (content.isNotEmpty)
                           Text(
                             translate(content),
-                            style: TextStyle(
-                                height: 1.5,
-                                color: Colors.white,
-                                fontWeight: FontWeight.normal,
-                                fontSize: 13),
+                            style: pal.textBody.copyWith(height: 1.5, fontSize: 13),
                           ).marginOnly(bottom: 20)
                       ] +
                       (btnText.isNotEmpty
@@ -649,8 +690,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                       padding: 8,
                                       isOutline: true,
                                       text: translate(btnText),
-                                      textColor: Colors.white,
-                                      borderColor: Colors.white,
+                                      textColor: pal.text,
+                                      borderColor: pal.cardBorder,
                                       textSize: 20,
                                       radius: 10,
                                       onTap: onPressed,
@@ -666,10 +707,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                           await launchUrl(Uri.parse(link!)),
                                       child: Text(
                                         translate(help),
-                                        style: TextStyle(
+                                        style: pal.textLink.copyWith(
                                             decoration:
                                                 TextDecoration.underline,
-                                            color: Colors.white,
                                             fontSize: 12),
                                       )).marginOnly(top: 6)),
                             ]
@@ -682,7 +722,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             child: IconButton(
               icon: Icon(
                 Icons.close,
-                color: Colors.white,
+                color: pal.muted,
                 size: 20,
               ),
               onPressed: closeCard,
@@ -697,6 +737,29 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     super.initState();
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
+      try {
+        final raw = bind.mainGetCommonSync(key: 'rw-update-status');
+        if (raw.isNotEmpty) {
+          final st = jsonDecode(raw);
+          if (st is Map<String, dynamic>) {
+            RwUpdates.ingest(st);
+          }
+        }
+      } catch (_) {}
+      // Redesign dropped ConnectionPage's OnlineStatusWidget; keep svcStatus
+      // in sync with the real rendezvous connect-status stream.
+      try {
+        final status = jsonDecode(await bind.mainGetConnectStatus())
+            as Map<String, dynamic>;
+        final statusNum = status['status_num'] as int;
+        if (statusNum == 0) {
+          stateGlobal.svcStatus.value = SvcStatus.connecting;
+        } else if (statusNum == 1) {
+          stateGlobal.svcStatus.value = SvcStatus.ready;
+        } else {
+          stateGlobal.svcStatus.value = SvcStatus.notReady;
+        }
+      } catch (_) {}
       final error = await bind.mainGetError();
       if (systemError != error) {
         systemError = error;
@@ -879,6 +942,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       shouldBeBlocked(_block, canBeBlocked);
+      gFFI.userModel.refreshCurrentUser();
     }
   }
 }

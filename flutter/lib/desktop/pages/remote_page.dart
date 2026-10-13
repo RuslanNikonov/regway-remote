@@ -23,6 +23,7 @@ import '../widgets/remote_toolbar.dart';
 import '../widgets/kb_layout_type_chooser.dart';
 import '../widgets/tabbar_widget.dart';
 import 'macos_full_screen_focus_recovery.dart';
+import 'package:flutter_hbb/regway/reconnect_overlay.dart';
 
 import 'package:flutter_hbb/native/custom_cursor.dart'
     if (dart.library.html) 'package:flutter_hbb/web/custom_cursor.dart';
@@ -777,6 +778,7 @@ class _RemotePageState extends State<RemotePage>
                         ])
                       : remoteToolbar(context)),
               _ffi.ffiModel.pi.isSet.isFalse ? emptyOverlay() : Offstage(),
+              RwReconnectOverlay(onDisconnect: closeConnection),
             ],
           ),
         ],
@@ -789,6 +791,7 @@ class _RemotePageState extends State<RemotePage>
         final imageReady = _ffi.ffiModel.pi.isSet.isTrue &&
             _ffi.ffiModel.waitForFirstImage.isFalse;
         if (imageReady) {
+          RwReconnect.restored();
           // If the privacy mode(disable physical displays) is switched,
           // we should not dismiss the dialog immediately.
           if (DateTime.now().difference(togglePrivacyModeTime) >

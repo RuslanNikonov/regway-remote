@@ -529,6 +529,10 @@ impl Connection {
         meta: super::ConnectionMeta,
         unauthorized: UnauthorizedID,
     ) {
+        if crate::login_gate::refuse_incoming().is_err() {
+            log::warn!("login-gate: dropping incoming connection {id} (not logged in)");
+            return;
+        }
         let super::ConnectionMeta {
             control_permissions,
             controlled_context,
@@ -1224,9 +1228,16 @@ impl Connection {
             raii::AuthedConnID::check_remove_session(conn.inner.id(), conn.session_key());
         }
 
-        conn.post_conn_audit(json!({
-            "action": "close",
-        }));
+        // C9: close only for an authed session, with non-empty from_peer + session_id.
+        if conn.authed_conn_id.is_some()
+            && !conn.lr.my_id.is_empty()
+            && conn.lr.session_id != 0
+        {
+            conn.post_conn_audit(json!({
+                "action": "close",
+                "from_peer": conn.lr.my_id,
+            }));
+        }
         if let Some(s) = conn.server.upgrade() {
             let mut s = s.write().unwrap();
             s.remove_connection(&conn.inner);
@@ -1511,14 +1522,9 @@ impl Connection {
         msg_out.set_hash(self.hash.clone());
         self.send(msg_out).await;
         self.get_api_server();
-        let mut audit = json!({
-            "ip": addr.ip(),
-            "action": "new",
-        });
-        if let Some(audit_ref) = self.conn_audit_ref() {
-            audit["conn_audit_ref"] = json!(audit_ref);
-        }
-        self.post_conn_audit(audit);
+        // C9: do not post action=new here. session_id is still 0 and from_peer
+        // is empty, so the 10s/30s retry of a 200 JSON body used to look like a
+        // second admin timeout. One session = one new + one close, both after login.
         true
     }
 
@@ -1690,28 +1696,10 @@ impl Connection {
                 match crate::post_request_with_status(url.clone(), body.clone(), "").await {
                     Ok((status, text)) => {
                         if (200..300).contains(&status) {
-                            // Success is an empty body. hbbs reports handler
-                            // failures (e.g. a db write error) as 200 with an
-                            // {"error": ...} body - retryable: the server
-                            // releases the record's nonce when its write fails,
-                            // so trying again is what stores the record. Any
-                            // other nonempty body did not come from the audit
-                            // handler (a proxy interposing a 2xx maintenance
-                            // page, a malformed error) and must not be mistaken
-                            // for storage, so it is retried rather than dropped.
-                            if text.trim().is_empty() {
-                                return Ok(text);
+                            match Self::audit_2xx_as_success(&text) {
+                                Ok(()) => return Ok(text),
+                                Err((retryable, err)) => (retryable, err),
                             }
-                            let server_err = serde_json::from_str::<Value>(&text)
-                                .ok()
-                                .and_then(|v| v.get("error")?.as_str().map(|s| s.to_owned()))
-                                .filter(|e| !e.is_empty());
-                            let (label, detail) = match &server_err {
-                                Some(e) => ("server error", e.as_str()),
-                                None => ("unexpected response body", text.as_str()),
-                            };
-                            let brief: String = detail.chars().take(128).collect();
-                            (true, format!("{}: {}", label, brief))
                         } else {
                             let brief: String = text.chars().take(128).collect();
                             // 408 and 429 are the transient 4xx: the request timed
@@ -1755,6 +1743,25 @@ impl Connection {
                 bail!("{}", err);
             }
         }
+    }
+
+    /// C9: 2xx with an empty body or JSON without `"error"` is success.
+    /// Previously a 200 JSON ack (no error) was retried at 10s and 30s and
+    /// showed up as extra action=new rows with session_id=0.
+    fn audit_2xx_as_success(text: &str) -> std::result::Result<(), (bool, String)> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return Ok(());
+        }
+        if let Ok(v) = serde_json::from_str::<Value>(trimmed) {
+            if let Some(e) = v.get("error").and_then(|e| e.as_str()).filter(|e| !e.is_empty()) {
+                let brief: String = e.chars().take(128).collect();
+                return Err((true, format!("server error: {brief}")));
+            }
+            return Ok(());
+        }
+        let brief: String = trimmed.chars().take(128).collect();
+        Err((true, format!("unexpected response body: {brief}")))
     }
 
     fn set_conn_audit_primary_auth(&mut self, method: ConnAuditPrimaryAuth) {
@@ -1921,14 +1928,22 @@ impl Connection {
             .get(&self.session_key())
             .map(|s| s.last_recv_time.clone());
         self.normalize_conn_audit_auth_fields();
-        let mut audit = json!({"peer": ((&self.lr.my_id, &self.lr.my_name)), "type": conn_type});
-        if self.conn_audit_primary_auth != ConnAuditPrimaryAuth::None {
-            audit["primary_auth"] = json!(self.conn_audit_primary_auth.as_i64());
+        // C9: the only action=new for this session. Requires from_peer + session_id.
+        if !self.lr.my_id.is_empty() && self.lr.session_id != 0 {
+            let mut audit = json!({
+                "action": "new",
+                "from_peer": self.lr.my_id,
+                "peer": ((&self.lr.my_id, &self.lr.my_name)),
+                "type": conn_type,
+            });
+            if self.conn_audit_primary_auth != ConnAuditPrimaryAuth::None {
+                audit["primary_auth"] = json!(self.conn_audit_primary_auth.as_i64());
+            }
+            if self.conn_audit_two_factor != ConnAuditTwoFactor::None {
+                audit["two_factor"] = json!(self.conn_audit_two_factor.as_i64());
+            }
+            self.post_conn_audit(audit);
         }
-        if self.conn_audit_two_factor != ConnAuditTwoFactor::None {
-            audit["two_factor"] = json!(self.conn_audit_two_factor.as_i64());
-        }
-        self.post_conn_audit(audit);
         #[allow(unused_mut)]
         let mut username = crate::platform::get_active_username();
         let mut res = LoginResponse::new();
@@ -7949,5 +7964,15 @@ mod test {
         // is all three fields, and either of those is someone else's screen to lock.
         assert!(!replaced_by(&conn(3, remote, key(8, "peer")), 2, &mine));
         assert!(!replaced_by(&conn(3, remote, key(7, "other")), 2, &mine));
+    }
+
+    #[test]
+    fn test_audit_2xx_json_without_error_is_success() {
+        assert!(Connection::audit_2xx_as_success("").is_ok());
+        assert!(Connection::audit_2xx_as_success("  ").is_ok());
+        assert!(Connection::audit_2xx_as_success("{\"ok\":true}").is_ok());
+        assert!(Connection::audit_2xx_as_success("{\"error\":\"\"}").is_ok());
+        assert!(Connection::audit_2xx_as_success("{\"error\":\"db\"}").is_err());
+        assert!(Connection::audit_2xx_as_success("<html>maintenance</html>").is_err());
     }
 }

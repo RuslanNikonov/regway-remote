@@ -29,6 +29,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 
 import '../consts.dart';
+import 'package:flutter_hbb/regway/theme.dart';
 import 'common/widgets/overlay.dart';
 import 'mobile/pages/file_manager_page.dart';
 import 'mobile/pages/remote_page.dart';
@@ -167,31 +168,31 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
   final Color? divider;
 
   static final light = ColorThemeExtension(
-    border: Color(0xFFCCCCCC),
-    border2: Color(0xFFBBBBBB),
-    border3: Colors.black26,
-    highlight: Color(0xFFE5E5E5),
-    drag_indicator: Colors.grey[800],
-    shadow: Colors.black,
-    errorBannerBg: Color(0xFFFDEEEB),
-    me: Colors.green,
+    border: RwPalette.light.cardBorder,
+    border2: RwPalette.light.muted,
+    border3: RwPalette.light.cardBorder,
+    highlight: const Color(0xFFE8EAF4),
+    drag_indicator: RwPalette.light.muted,
+    shadow: const Color(0x140A0820),
+    errorBannerBg: const Color(0xFFFDEEEB),
+    me: RwPalette.light.accent,
     toastBg: Colors.black.withOpacity(0.6),
     toastText: Colors.white,
-    divider: Colors.black38,
+    divider: RwPalette.light.cardBorder,
   );
 
   static final dark = ColorThemeExtension(
-    border: Color(0xFF555555),
-    border2: Color(0xFFE5E5E5),
-    border3: Colors.white24,
-    highlight: Color(0xFF3F3F3F),
-    drag_indicator: Colors.grey,
-    shadow: Colors.grey,
-    errorBannerBg: Color(0xFF470F2D),
-    me: Colors.greenAccent,
-    toastBg: Colors.white.withOpacity(0.6),
-    toastText: Colors.black,
-    divider: Colors.white38,
+    border: RwPalette.dark.cardBorder,
+    border2: RwPalette.dark.muted,
+    border3: RwPalette.dark.cardBorder,
+    highlight: RwPalette.dark.cardHover,
+    drag_indicator: RwPalette.dark.muted,
+    shadow: Colors.black,
+    errorBannerBg: const Color(0xFF3A1020),
+    me: RwPalette.dark.accent,
+    toastBg: Colors.black.withOpacity(0.6),
+    toastText: RwPalette.dark.text,
+    divider: RwPalette.dark.cardBorder,
   );
 
   @override
@@ -249,17 +250,19 @@ class MyTheme {
   MyTheme._();
 
   static const Color grayBg = Color(0xFFEFEFF2);
-  static const Color accent = Color(0xFF0071FF);
-  static const Color accent50 = Color(0x770071FF);
-  static const Color accent80 = Color(0xAA0071FF);
-  static const Color canvasColor = Color(0xFF212121);
+  static const Color accent = RwColors.accent;
+  static const Color accent50 = Color(0x7738D9FF);
+  static const Color accent80 = Color(0xAA38D9FF);
+  static const Color canvasColor = RwColors.bg;
   static const Color border = Color(0xFFCCCCCC);
-  static const Color idColor = Color(0xFF00B6F0);
+  static const Color idColor = RwColors.accent;
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
   static const Color cmIdColor = Color(0xFF21790B);
   static const Color dark = Colors.black87;
-  static const Color button = Color(0xFF2C8CFF);
-  static const Color hoverBorder = Color(0xFF999999);
+  static const Color button = RwColors.accent;
+  static const Color hoverBorder = RwColors.accentHover;
+  static const Color onAccent = RwColors.onAccent;
+  static const Color danger = RwColors.danger;
 
   // ListTile
   static const ListTileThemeData listTileTheme = ListTileThemeData(
@@ -270,8 +273,8 @@ class MyTheme {
     ),
   );
 
-  static SwitchThemeData switchTheme() {
-    return SwitchThemeData(
+  static SwitchThemeData switchTheme([RwPalette p = RwPalette.dark]) {
+    return rwSwitchTheme(p).copyWith(
         splashRadius: (isDesktop || isWebDesktop) ? 0 : kRadialReactionRadius);
   }
 
@@ -373,45 +376,61 @@ class MyTheme {
     // https://stackoverflow.com/questions/77537315/after-upgrading-to-flutter-3-16-the-app-bar-background-color-button-size-and
     useMaterial3: false,
     brightness: Brightness.light,
-    hoverColor: Color.fromARGB(255, 224, 224, 224),
-    scaffoldBackgroundColor: Colors.white,
-    dialogBackgroundColor: Colors.white,
-    appBarTheme: AppBarTheme(
+    fontFamily: RwFonts.body,
+    hoverColor: const Color(0xFFE8EAF4),
+    scaffoldBackgroundColor: RwPalette.light.bg,
+    dialogBackgroundColor: RwPalette.light.card,
+    canvasColor: RwPalette.light.bg,
+    appBarTheme: const AppBarTheme(
       shadowColor: Colors.transparent,
+      backgroundColor: Color(0xFFF4F5FB),
+      foregroundColor: Color(0xFF14122B),
     ),
     dialogTheme: DialogTheme(
-      elevation: 15,
+      elevation: 8,
+      backgroundColor: RwPalette.light.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18.0),
-        side: BorderSide(
+        borderRadius: BorderRadius.circular(RwDim.radiusPanel),
+        side: const BorderSide(
           width: 1,
-          color: grayBg,
+          color: Color(0xFFDFE1EE),
         ),
       ),
     ),
     scrollbarTheme: scrollbarTheme,
-    inputDecorationTheme: isDesktop
-        ? InputDecorationTheme(
-            fillColor: grayBg,
-            filled: true,
-            isDense: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          )
-        : null,
+    inputDecorationTheme:
+        (isDesktop || isWebDesktop) ? rwInputDecorationTheme(RwPalette.light) : null,
     textTheme: const TextTheme(
-        titleLarge: TextStyle(fontSize: 19, color: Colors.black87),
-        titleSmall: TextStyle(fontSize: 14, color: Colors.black87),
-        bodySmall: TextStyle(fontSize: 12, color: Colors.black87, height: 1.25),
-        bodyMedium:
-            TextStyle(fontSize: 14, color: Colors.black87, height: 1.25),
-        labelLarge: TextStyle(fontSize: 16.0, color: MyTheme.accent80)),
-    cardColor: grayBg,
-    hintColor: Color(0xFFAAAAAA),
+      titleLarge: TextStyle(
+          fontFamily: RwFonts.head,
+          fontWeight: FontWeight.w600,
+          fontSize: 19,
+          color: Color(0xFF14122B)),
+      titleSmall: TextStyle(
+          fontFamily: RwFonts.body, fontSize: 14, color: Color(0xFF14122B)),
+      bodySmall: TextStyle(
+          fontFamily: RwFonts.body,
+          fontSize: 12,
+          height: 1.25,
+          color: Color(0xFF5D6180)),
+      bodyMedium: TextStyle(
+          fontFamily: RwFonts.body,
+          fontSize: 14,
+          height: 1.25,
+          color: Color(0xFF14122B)),
+      labelLarge: TextStyle(
+        fontFamily: RwFonts.body,
+        fontSize: 16.0,
+        fontWeight: FontWeight.bold,
+        color: Color(0xFF0A9CC2),
+      ),
+    ),
+    cardColor: RwPalette.light.card,
+    hintColor: RwPalette.light.muted,
     visualDensity: VisualDensity.adaptivePlatformDensity,
     tabBarTheme: const TabBarTheme(
-      labelColor: Colors.black87,
+      labelColor: Color(0xFF14122B),
+      unselectedLabelColor: Color(0xFF5D6180),
     ),
     tooltipTheme: tooltipTheme(),
     splashColor: (isDesktop || isWebDesktop) ? Colors.transparent : null,
@@ -421,98 +440,109 @@ class MyTheme {
         ? TextButtonThemeData(
             style: TextButton.styleFrom(
               splashFactory: NoSplash.splashFactory,
+              disabledForegroundColor: const Color(0xFF5D6180),
+              foregroundColor: const Color(0xFF0A9CC2),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18.0),
+                borderRadius: BorderRadius.circular(RwDim.radiusField),
               ),
             ),
           )
         : mobileTextButtonTheme,
     elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: MyTheme.accent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-      ),
+      style: rwFilledButtonStyle(RwPalette.light),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        backgroundColor: grayBg,
-        foregroundColor: Colors.black87,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-      ),
+      style: rwGhostButtonStyle(RwPalette.light),
     ),
-    switchTheme: switchTheme(),
+    switchTheme: switchTheme(RwPalette.light),
     radioTheme: radioTheme(),
     checkboxTheme: checkboxTheme,
     listTileTheme: listTileTheme,
     menuBarTheme: MenuBarThemeData(
-        style:
-            MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
-    colorScheme: ColorScheme.light(
-        primary: Colors.blue, secondary: accent, background: grayBg),
+        style: MenuStyle(
+            backgroundColor:
+                MaterialStatePropertyAll(RwPalette.light.card))),
+    colorScheme: const ColorScheme.light(
+      primary: Color(0xFF0A9CC2),
+      secondary: Color(0xFF7C5CFF),
+      background: Color(0xFFF4F5FB),
+      surface: Color(0xFFFFFFFF),
+      error: Color(0xFFD41E48),
+      onPrimary: Color(0xFFFFFFFF),
+    ),
     popupMenuTheme: PopupMenuThemeData(
-        color: Colors.white,
+        color: RwPalette.light.card,
         shape: RoundedRectangleBorder(
           side: BorderSide(
               color: (isDesktop || isWebDesktop)
-                  ? Color(0xFFECECEC)
+                  ? RwPalette.light.cardBorder
                   : Colors.transparent),
-          borderRadius: BorderRadius.all(Radius.circular(8.0)),
+          borderRadius: BorderRadius.all(Radius.circular(RwDim.radiusField)),
         )),
   ).copyWith(
     extensions: <ThemeExtension<dynamic>>[
       ColorThemeExtension.light,
       TabbarTheme.light,
+      RwPalette.light,
     ],
   );
   static ThemeData darkTheme = ThemeData(
     useMaterial3: false,
     brightness: Brightness.dark,
-    hoverColor: Color.fromARGB(255, 45, 46, 53),
-    scaffoldBackgroundColor: Color(0xFF18191E),
-    dialogBackgroundColor: Color(0xFF18191E),
-    appBarTheme: AppBarTheme(
+    fontFamily: RwFonts.body,
+    hoverColor: RwPalette.dark.cardHover,
+    scaffoldBackgroundColor: RwColors.bg,
+    dialogBackgroundColor: RwPalette.dark.card,
+    canvasColor: RwColors.bg,
+    appBarTheme: const AppBarTheme(
       shadowColor: Colors.transparent,
+      backgroundColor: RwColors.bg,
+      foregroundColor: RwColors.text,
     ),
     dialogTheme: DialogTheme(
       elevation: 15,
+      backgroundColor: RwPalette.dark.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18.0),
-        side: BorderSide(
+        borderRadius: BorderRadius.circular(RwDim.radiusPanel),
+        side: const BorderSide(
           width: 1,
-          color: Color(0xFF24252B),
+          color: RwColors.border,
         ),
       ),
     ),
     scrollbarTheme: scrollbarThemeDark,
-    inputDecorationTheme: (isDesktop || isWebDesktop)
-        ? InputDecorationTheme(
-            fillColor: Color(0xFF24252B),
-            filled: true,
-            isDense: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          )
-        : null,
+    inputDecorationTheme:
+        (isDesktop || isWebDesktop) ? rwInputDecorationTheme() : null,
     textTheme: const TextTheme(
-      titleLarge: TextStyle(fontSize: 19),
-      titleSmall: TextStyle(fontSize: 14),
-      bodySmall: TextStyle(fontSize: 12, height: 1.25),
-      bodyMedium: TextStyle(fontSize: 14, height: 1.25),
+      titleLarge: TextStyle(
+          fontFamily: RwFonts.head,
+          fontWeight: FontWeight.w600,
+          fontSize: 19,
+          color: RwColors.text),
+      titleSmall: TextStyle(
+          fontFamily: RwFonts.body, fontSize: 14, color: RwColors.text),
+      bodySmall: TextStyle(
+          fontFamily: RwFonts.body,
+          fontSize: 12,
+          height: 1.25,
+          color: RwColors.muted),
+      bodyMedium: TextStyle(
+          fontFamily: RwFonts.body,
+          fontSize: 14,
+          height: 1.25,
+          color: RwColors.text),
       labelLarge: TextStyle(
+        fontFamily: RwFonts.body,
         fontSize: 16.0,
         fontWeight: FontWeight.bold,
         color: accent80,
       ),
     ),
-    cardColor: Color(0xFF24252B),
+    cardColor: RwPalette.dark.card,
     visualDensity: VisualDensity.adaptivePlatformDensity,
     tabBarTheme: const TabBarTheme(
-      labelColor: Colors.white70,
+      labelColor: RwColors.text,
+      unselectedLabelColor: RwColors.muted,
     ),
     tooltipTheme: tooltipTheme(),
     splashColor: (isDesktop || isWebDesktop) ? Colors.transparent : null,
@@ -522,35 +552,19 @@ class MyTheme {
         ? TextButtonThemeData(
             style: TextButton.styleFrom(
               splashFactory: NoSplash.splashFactory,
-              disabledForegroundColor: Colors.white70,
-              foregroundColor: Colors.white70,
+              disabledForegroundColor: RwColors.muted,
+              foregroundColor: RwColors.accent,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18.0),
+                borderRadius: BorderRadius.circular(RwDim.radiusField),
               ),
             ),
           )
         : mobileTextButtonTheme,
     elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: MyTheme.accent,
-        foregroundColor: Colors.white,
-        disabledForegroundColor: Colors.white70,
-        disabledBackgroundColor: Colors.white10,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-      ),
+      style: rwFilledButtonStyle(),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        backgroundColor: Color(0xFF24252B),
-        side: BorderSide(color: Colors.white12, width: 0.5),
-        disabledForegroundColor: Colors.white70,
-        foregroundColor: Colors.white70,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-      ),
+      style: rwGhostButtonStyle(),
     ),
     switchTheme: switchTheme(),
     radioTheme: radioTheme(),
@@ -558,21 +572,25 @@ class MyTheme {
     listTileTheme: listTileTheme,
     menuBarTheme: MenuBarThemeData(
         style: MenuStyle(
-            backgroundColor: MaterialStatePropertyAll(Color(0xFF121212)))),
-    colorScheme: ColorScheme.dark(
-      primary: Colors.blue,
-      secondary: accent,
-      background: Color(0xFF24252B),
+            backgroundColor: MaterialStatePropertyAll(RwPalette.dark.card))),
+    colorScheme: const ColorScheme.dark(
+      primary: RwColors.accent,
+      secondary: RwColors.violet,
+      background: RwColors.bg,
+      surface: Color(0xFF15123A),
+      error: RwColors.danger,
     ),
     popupMenuTheme: PopupMenuThemeData(
+        color: RwPalette.dark.card,
         shape: RoundedRectangleBorder(
-      side: BorderSide(color: Colors.white24),
-      borderRadius: BorderRadius.all(Radius.circular(8.0)),
+      side: const BorderSide(color: RwColors.border),
+      borderRadius: BorderRadius.all(Radius.circular(RwDim.radiusField)),
     )),
   ).copyWith(
     extensions: <ThemeExtension<dynamic>>[
       ColorThemeExtension.dark,
       TabbarTheme.dark,
+      RwPalette.dark,
     ],
   );
 
@@ -2341,6 +2359,9 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
     }
   }
   if (type != null && id != null) {
+    if (!gFFI.userModel.isLogin) {
+      return false;
+    }
     switch (type) {
       case UriLinkType.remoteDesktop:
         Future.delayed(Duration.zero, () {
@@ -2580,6 +2601,7 @@ connect(BuildContext context, String id,
     String? connToken,
     bool? isSharedPassword}) async {
   if (id == '') return;
+  if (!gFFI.userModel.isLogin) return;
   if (!isDesktop || desktopType == DesktopType.main) {
     try {
       if (Get.isRegistered<IDTextEditingController>()) {
@@ -3020,8 +3042,14 @@ int versionCmp(String v1, String v2) {
   return bind.versionToNumber(v: v1) - bind.versionToNumber(v: v2);
 }
 
-String getWindowName({WindowType? overrideType}) {
+String displayAppName() {
   final name = bind.mainGetAppNameSync();
+  if (name == 'RegWayRemote') return 'RegWay Remote';
+  return name;
+}
+
+String getWindowName({WindowType? overrideType}) {
+  final name = displayAppName();
   switch (overrideType ?? kWindowType) {
     case WindowType.Main:
       return name;
@@ -4066,6 +4094,9 @@ void earlyAssert() {
 }
 
 void checkUpdate() {
+  try {
+    bind.mainSetCommon(key: 'rw-update-check', value: '1');
+  } catch (_) {}
   if (!isWeb) {
     if (!bind.isCustomClient()) {
       platformFFI.registerEventHandler(

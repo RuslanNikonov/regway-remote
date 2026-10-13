@@ -150,7 +150,7 @@ class ConfigOP {
   ConfigOP({required this.op, required this.icon});
 }
 
-class _OidcAuthController {
+class OidcAuthController {
   final RxString curOP = ''.obs;
   Future<void> _pendingOperation = Future<void>.value();
   int _authAttempt = 0;
@@ -654,11 +654,11 @@ class LoginWidgetUserPass extends StatelessWidget {
     return Padding(
         padding: EdgeInsets.all(0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 8.0),
             DialogTextField(
-                title: translate(DialogTextField.kUsernameTitle),
+                title: translate('Email or login'),
                 controller: username,
                 focusNode: userFocusNode,
                 prefixIcon: DialogTextField.kUsernameIcon,
@@ -669,28 +669,27 @@ class LoginWidgetUserPass extends StatelessWidget {
               reRequestFocus: true,
               errorText: passMsg,
             ),
-            // NOT use Offstage to wrap LinearProgressIndicator
-            if (isInProgress) const LinearProgressIndicator(),
-            const SizedBox(height: 12.0),
-            FittedBox(
-                child:
-                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Container(
-                height: 38,
-                width: 200,
-                child: Obx(() => ElevatedButton(
-                      child: Text(
-                        translate('Login'),
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      onPressed: curOP.value.isEmpty && !isInProgress
-                          ? () {
-                              onLogin();
-                            }
-                          : null,
-                    )),
+            if (isInProgress)
+              const LinearProgressIndicator(
+                color: Color(0xFF38D9FF),
+                backgroundColor: Color(0x40A7ABC9),
               ),
-            ])),
+            const SizedBox(height: 12.0),
+            SizedBox(
+              height: 42,
+              child: Obx(() => ElevatedButton(
+                    child: Text(
+                      translate('Login'),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                    onPressed: curOP.value.isEmpty && !isInProgress
+                        ? () {
+                            onLogin();
+                          }
+                        : null,
+                  )),
+            ),
           ],
         ));
   }
@@ -729,7 +728,7 @@ Future<bool?> _openLoginDialog() async {
   String? usernameMsg;
   String? passwordMsg;
   var isInProgress = false;
-  final oidcAuth = _OidcAuthController();
+  final oidcAuth = OidcAuthController();
   final curOP = oidcAuth.curOP;
   // Track hover state for the close icon
   bool isCloseHovered = false;
@@ -937,7 +936,12 @@ Future<bool?> _openLoginDialog() async {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          translate('Login'),
+          bind.mainGetAppNameSync(),
+          style: const TextStyle(
+            fontFamily: 'Unbounded',
+            fontWeight: FontWeight.w600,
+            fontSize: 22,
+          ),
         ).marginOnly(top: MyTheme.dialogPadding),
         MouseRegion(
           onEnter: (_) => setState(() => isCloseHovered = true),

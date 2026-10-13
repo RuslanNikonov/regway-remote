@@ -81,6 +81,14 @@ fn initialize(app_dir: &str, custom_client_config: &str) {
     {
         // core_main's init_log does not work for flutter since it is only applied to its load_library in main.c
         hbb_common::init_log(false, "flutter_ffi");
+        crate::crash::install_hooks();
+        crate::ui_interface::ensure_unique_permanent_password();
+        crate::rw_update::ensure_started();
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        crate::crash::install_hooks();
+        crate::ui_interface::ensure_unique_permanent_password();
     }
 }
 
@@ -2718,6 +2726,25 @@ pub fn main_get_common(key: String) -> String {
         return ui_interface::is_permanent_password_set().to_string();
     } else if key == "local-permanent-password-set" {
         return ui_interface::is_local_permanent_password_set().to_string();
+    } else if key == "permanent-password-plain" {
+        return ui_interface::load_permanent_password_display();
+    } else if key == "hostname" {
+        return crate::hostname();
+    } else if key == "rw-crash-pending" {
+        return if crate::crash::pending() {
+            "Y".into()
+        } else {
+            "N".into()
+        };
+    } else if key == "rw-crash-log-path" {
+        return crate::crash::log_path().to_string_lossy().into();
+    } else if key == "rw-update-status" {
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            return crate::rw_update::status_json();
+        }
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        return "{}".into();
     } else {
         if key.starts_with("download-data-") {
             let id = key.replace("download-data-", "");
@@ -2774,6 +2801,43 @@ pub fn main_get_common_sync(key: String) -> SyncReturn<String> {
 }
 
 pub fn main_set_common(_key: String, _value: String) {
+    match _key.as_str() {
+        "rw-crash-ack" => crate::crash::ack(),
+        "rw-crash-log" => crate::crash::write_crash("flutter", &_value),
+        "rw-force-sysinfo" => {
+            #[cfg(not(any(target_os = "ios")))]
+            crate::hbbs_http::sync::force_sysinfo_upload();
+        }
+        "rw-update-check" => {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            crate::rw_update::trigger_check();
+        }
+        "rw-update-download" => {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            crate::rw_update::trigger_download();
+        }
+        "rw-update-install" => {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            crate::rw_update::trigger_install();
+        }
+        "rw-update-retry" => {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            crate::rw_update::trigger_retry();
+        }
+        "rw-update-mode" => {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            crate::rw_update::set_mode(&_value);
+        }
+        "rw-rename-own" => {
+            let name = _value.trim().to_owned();
+            if !name.is_empty() {
+                set_option(keys::OPTION_PRESET_DEVICE_NAME.to_owned(), name);
+                #[cfg(not(any(target_os = "ios")))]
+                crate::hbbs_http::sync::force_sysinfo_upload();
+            }
+        }
+        _ => {}
+    }
     #[cfg(target_os = "windows")]
     if _key == "install-printer" && crate::platform::is_win_10_or_greater() {
         std::thread::spawn(move || {

@@ -24,6 +24,11 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../common/widgets/dialog.dart';
 import '../../common/widgets/login.dart';
+import 'package:flutter_hbb/regway/nav.dart';
+import 'package:flutter_hbb/regway/theme.dart';
+import 'package:flutter_hbb/regway/tips.dart';
+import 'package:flutter_hbb/regway/updates.dart';
+import 'package:flutter_hbb/regway/widgets.dart';
 
 const double _kTabWidth = 200;
 const double _kTabHeight = 42;
@@ -55,11 +60,13 @@ enum SettingsTabKey {
   display,
   account,
   printer,
+  updates,
   about,
 }
 
 class DesktopSettingPage extends StatefulWidget {
   final SettingsTabKey initialTabkey;
+  static SettingsTabKey? pendingTab;
   static final List<SettingsTabKey> tabKeys = [
     if (bind.mainGetBuildinOption(key: kOptionHideGeneralSetting) != 'Y')
       SettingsTabKey.general,
@@ -77,6 +84,7 @@ class DesktopSettingPage extends StatefulWidget {
         !bind.isDisableSettings() &&
         bind.mainGetBuildinOption(key: kOptionHideRemotePrinterSetting) != 'Y')
       SettingsTabKey.printer,
+    SettingsTabKey.updates,
     SettingsTabKey.about,
   ];
 
@@ -92,9 +100,15 @@ class DesktopSettingPage extends StatefulWidget {
       if (index == -1) {
         return;
       }
+      pendingTab = page;
+      if (!bind.isIncomingOnly()) {
+        RwNav.go(RwNavId.settings);
+      }
       if (Get.isRegistered<PageController>(tag: _kSettingPageControllerTag) &&
           Get.isRegistered<Rx<SettingsTabKey>>(tag: _kSettingPageTabKeyTag)) {
-        DesktopTabPage.onAddSetting(initialPage: page);
+        if (bind.isIncomingOnly()) {
+          DesktopTabPage.onAddSetting(initialPage: page);
+        }
         PageController controller =
             Get.find<PageController>(tag: _kSettingPageControllerTag);
         Rx<SettingsTabKey> selected =
@@ -126,7 +140,8 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   Timer? _videoConnTimer;
 
   _DesktopSettingPageState(SettingsTabKey initialTabkey) {
-    var initialIndex = DesktopSettingPage.tabKeys.indexOf(initialTabkey);
+    var initialIndex = DesktopSettingPage.tabKeys
+        .indexOf(DesktopSettingPage.pendingTab ?? initialTabkey);
     if (initialIndex == -1) {
       initialIndex = 0;
     }
@@ -208,6 +223,10 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           settingTabs
               .add(_TabInfo(tab, 'Printer', Icons.print_outlined, Icons.print));
           break;
+        case SettingsTabKey.updates:
+          settingTabs.add(_TabInfo(
+              tab, 'Updates', Icons.system_update_alt_outlined, Icons.system_update_alt));
+          break;
         case SettingsTabKey.about:
           settingTabs
               .add(_TabInfo(tab, 'About', Icons.info_outline, Icons.info));
@@ -238,6 +257,9 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           break;
         case SettingsTabKey.printer:
           children.add(const _Printer());
+          break;
+        case SettingsTabKey.updates:
+          children.add(const RwUpdatesPage());
           break;
         case SettingsTabKey.about:
           children.add(const _About());
@@ -274,70 +296,109 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Colors.transparent,
       body: _buildBlock(
         children: <Widget>[
-          SizedBox(
-            width: _kTabWidth,
-            child: Column(
-              children: [
-                _header(context),
-                Flexible(child: _listView(tabs: _settingTabs())),
-              ],
-            ),
-          ),
-          const VerticalDivider(width: 1),
           Expanded(
-            child: Container(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: PageView(
-                controller: controller,
-                physics: NeverScrollableScrollPhysics(),
-                children: _children(),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _header(context),
+                  _horizontalTabs(_settingTabs()),
+                  Expanded(
+                    child: PageView(
+                      controller: controller,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: _children(),
+                    ),
+                  ),
+                  _footer(context),
+                ],
               ),
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
   Widget _header(BuildContext context) {
-    final settingsText = Text(
-      translate('Settings'),
-      textAlign: TextAlign.left,
-      style: const TextStyle(
-        color: _accentColor,
-        fontSize: _kTitleFontSize,
-        fontWeight: FontWeight.w400,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(translate('Settings'), style: rwOf(context).textH1),
+          const SizedBox(height: 6),
+          Text(translate('Parameters of this computer'),
+              style: rwOf(context).textMuted),
+        ],
       ),
     );
-    return Row(
-      children: [
-        if (isWeb)
-          IconButton(
-            onPressed: () {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-            },
-            icon: Icon(Icons.arrow_back),
-          ).marginOnly(left: 5),
-        if (isWeb)
-          SizedBox(
-            height: 62,
-            child: Align(
-              alignment: Alignment.center,
-              child: settingsText,
-            ),
-          ).marginOnly(left: 20),
-        if (!isWeb)
-          SizedBox(
-            height: 62,
-            child: settingsText,
-          ).marginOnly(left: 20, top: 10),
-        const Spacer(),
-      ],
+  }
+
+  Widget _horizontalTabs(List<_TabInfo> tabs) {
+    return Obx(() {
+      final p = rwOf(context);
+      return Container(
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: p.cardBorder)),
+        ),
+        child: Row(
+          children: tabs.map((tab) {
+            final selected = tab.key == selectedTab.value;
+            return InkWell(
+              onTap: () {
+                final index = DesktopSettingPage.tabKeys.indexOf(tab.key);
+                if (index == -1) return;
+                controller.jumpToPage(index);
+                selectedTab.value = tab.key;
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      width: 2,
+                      color: selected ? p.accent : Colors.transparent,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  translate(tab.label),
+                  style: RwText.bodyStrong.copyWith(
+                    color: selected ? p.text : p.muted,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      );
+    });
+  }
+
+  Widget _footer(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          RwButton(
+            label: translate('Cancel'),
+            ghost: true,
+            onPressed: () => RwNav.go(RwNavId.computers),
+          ),
+          const SizedBox(width: 10),
+          RwButton(
+            label: translate('Save'),
+            onPressed: () => RwNav.go(RwNavId.computers),
+          ),
+        ],
+      ),
     );
   }
 
@@ -432,11 +493,12 @@ class _GeneralState extends State<_General> {
     }
 
     final isOptFixed = isOptionFixed(kCommConfKeyTheme);
+    // Theme: Системная / Тёмная / Светлая (system, dark, light)
     return _Card(title: 'Theme', children: [
       _Radio<String>(context,
-          value: 'light',
+          value: 'system',
           groupValue: current,
-          label: 'Light',
+          label: 'Follow System',
           onChanged: isOptFixed ? null : onChanged),
       _Radio<String>(context,
           value: 'dark',
@@ -444,9 +506,9 @@ class _GeneralState extends State<_General> {
           label: 'Dark',
           onChanged: isOptFixed ? null : onChanged),
       _Radio<String>(context,
-          value: 'system',
+          value: 'light',
           groupValue: current,
-          label: 'Follow System',
+          label: 'Light',
           onChanged: isOptFixed ? null : onChanged),
     ]);
   }
@@ -1365,25 +1427,15 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
               initialKey: modeInitialKey,
               onChanged: (key) => model.setApproveMode(key),
             ).marginOnly(left: _kContentHMargin),
-            if (usePassword) radios[0],
             if (usePassword)
-              _SubLabeledWidget(
-                  context,
-                  'One-time password length',
-                  Row(
-                    children: [
-                      ...lengthRadios,
-                    ],
-                  ),
-                  enabled: tmpEnabled && !locked),
-            if (usePassword) numericOneTimePassword,
-            if (usePassword) radios[1],
+              Padding(
+                padding: const EdgeInsets.only(
+                    left: _kContentHMargin, top: 8, bottom: 4),
+                child: Text(translate('Use permanent password'),
+                    style: const TextStyle(fontSize: _kContentFontSize)),
+              ),
             if (usePassword && !isChangePermanentPasswordDisabled())
-              _SubButton('Set permanent password', setPasswordDialog,
-                  permEnabled && !locked),
-            // if (usePassword)
-            //   hide_cm(!locked).marginOnly(left: _kContentHSubMargin - 6),
-            if (usePassword) radios[2],
+              _SubButton('Set permanent password', setPasswordDialog, !locked),
           ]);
         })));
   }
@@ -1790,26 +1842,22 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
       final titleWidget = showTooltip
           ? Row(
               children: [
-                Tooltip(
-                  waitDuration: Duration(milliseconds: 1000),
+                Text(
+                  translate(title),
+                  style: TextStyle(fontSize: _kContentFontSize),
+                ),
+                SizedBox(width: 5),
+                RwTip(
                   message: translate(tooltipMessage),
-                  child: Row(
-                    children: [
-                      Text(
-                        translate(title),
-                        style: TextStyle(fontSize: _kContentFontSize),
-                      ),
-                      SizedBox(width: 5),
-                      Icon(
-                        Icons.help_outline,
-                        size: 14,
-                        color: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.color
-                            ?.withOpacity(0.7),
-                      ),
-                    ],
+                  focus: true,
+                  child: Icon(
+                    Icons.help_outline,
+                    size: 14,
+                    color: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.color
+                        ?.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -2532,7 +2580,7 @@ class _AboutState extends State<_About> {
       final scrollController = ScrollController();
       return SingleChildScrollView(
         controller: scrollController,
-        child: _Card(title: translate('About RustDesk'), children: [
+        child: _Card(title: 'About RustDesk', children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2580,7 +2628,7 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\n$license',
+                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\nbased on RustDesk (AGPL-3.0)\n$license',
                             style: const TextStyle(color: Colors.white),
                           ),
                           Text(
@@ -2612,13 +2660,17 @@ Widget _Card(
     {required String title,
     required List<Widget> children,
     List<Widget>? title_suffix}) {
-  return Row(
-    children: [
-      Flexible(
-        child: SizedBox(
-          width: _kCardFixedWidth,
-          child: Card(
+  return Builder(builder: (context) {
+    final p = rwOf(context);
+    return Row(
+      children: [
+        Flexible(
+          child: _HoverCard(
+            width: _kCardFixedWidth,
+            margin: const EdgeInsets.only(left: _kCardLeftMargin, top: 15),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
                   children: [
@@ -2626,22 +2678,67 @@ Widget _Card(
                         child: Text(
                       translate(title),
                       textAlign: TextAlign.start,
-                      style: const TextStyle(
-                        fontSize: _kTitleFontSize,
-                      ),
+                      style: p.textH2,
                     )),
                     ...?title_suffix
                   ],
-                ).marginOnly(left: _kContentHMargin, top: 10, bottom: 10),
-                ...children
-                    .map((e) => e.marginOnly(top: 4, right: _kContentHMargin)),
+                ).marginOnly(bottom: 6),
+                ...children.map((e) => Container(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      decoration: BoxDecoration(
+                        border:
+                            Border(top: BorderSide(color: p.cardBorder)),
+                      ),
+                      child: e,
+                    )),
               ],
-            ).marginOnly(bottom: 10),
-          ).marginOnly(left: _kCardLeftMargin, top: 15),
+            ),
+          ),
+        ),
+      ],
+    );
+  });
+}
+
+class _HoverCard extends StatefulWidget {
+  final Widget child;
+  final double width;
+  final EdgeInsetsGeometry margin;
+  final EdgeInsetsGeometry padding;
+  const _HoverCard({
+    required this.child,
+    required this.width,
+    required this.margin,
+    required this.padding,
+  });
+
+  @override
+  State<_HoverCard> createState() => _HoverCardState();
+}
+
+class _HoverCardState extends State<_HoverCard> {
+  bool hover = false;
+  bool focus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = rwOf(context);
+    return MouseRegion(
+      onEnter: (_) => setState(() => hover = true),
+      onExit: (_) => setState(() => hover = false),
+      child: Focus(
+        canRequestFocus: false,
+        onFocusChange: (v) => setState(() => focus = v),
+        child: Container(
+          width: widget.width,
+          margin: widget.margin,
+          padding: widget.padding,
+          decoration: RwDecor.panelOf(p, hover: hover, focus: focus),
+          child: widget.child,
         ),
       ),
-    ],
-  );
+    );
+  }
 }
 
 // ignore: non_constant_identifier_names

@@ -15,6 +15,11 @@ import 'platform_model.dart';
 bool refreshingUser = false;
 
 class UserModel {
+  /// Must stay ≤ 60 s so a disable/delete in /_admin/ drops sessions in time.
+  static const Duration authHeartbeat = Duration(seconds: 30);
+  static const Duration authHeartbeatOffline = Duration(seconds: 10);
+  static const int confirmTtlSecs = 60;
+
   final RxString userName = ''.obs;
   final RxString displayName = ''.obs;
   final RxString avatar = ''.obs;
@@ -39,6 +44,8 @@ class UserModel {
   }
 
   WeakReference<FFI> parent;
+  Timer? _authHeartbeat;
+  bool _offlinePoll = false;
 
   UserModel(this.parent) {
     userName.listen((p0) {
@@ -48,15 +55,37 @@ class UserModel {
       //  For login success, should clear network error
       networkError.value = '';
     });
+    _armHeartbeat();
   }
 
-  void refreshCurrentUser() async {
+  void _armHeartbeat() {
+    _authHeartbeat?.cancel();
+    final d = _offlinePoll ? authHeartbeatOffline : authHeartbeat;
+    _authHeartbeat = Timer(d, () async {
+      await refreshCurrentUser();
+      _armHeartbeat();
+    });
+  }
+
+  bool _withinConfirmTtl() {
+    final raw = bind.mainGetLocalOption(key: 'rw-token-validated-at');
+    final ts = int.tryParse(raw);
+    if (ts == null || ts <= 0) return false;
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return now - ts < confirmTtlSecs;
+  }
+
+  Future<void> refreshCurrentUser() async {
     if (bind.isDisableAccount()) return;
     networkError.value = '';
     networkErrorFromServer.value = false;
     final token = bind.mainGetLocalOption(key: 'access_token');
     if (token == '') {
-      await updateOtherModels();
+      if (isLogin) {
+        await reset(resetOther: true);
+      } else {
+        await updateOtherModels();
+      }
       return;
     }
     _updateLocalUserInfo();
@@ -77,39 +106,54 @@ class UserModel {
             },
             body: json.encode(body));
       } catch (e) {
+        // Network timeout is not a 401. Keep the token (no re-login).
+        debugPrint('login-gate: currentUser unreachable (network error, not 401): $e');
         networkError.value = e.toString();
-        rethrow;
+        _offlinePoll = true;
+        if (!_withinConfirmTtl()) {
+          await _setApiReachable(false);
+        }
+        return;
       }
-      refreshingUser = false;
       final status = response.statusCode;
-      if (status == 401 || status == 400) {
-        reset(resetOther: status == 401);
+      // Disabled account: 401 {"error":"Unauthorized"} — revoke sessions + gate.
+      if (status == 401 || status == 403 || status == 400) {
+        await reset(resetOther: true);
         return;
       }
       final data = json.decode(decode_http_response(response));
       final error = data['error'];
       if (error != null) {
-        // The only failure known to come from the server itself, so the
-        // check-your-network tip does not apply. Flag before the message is
-        // set in the catch below so rebuilds read a consistent pair.
-        networkErrorFromServer.value = true;
-        throw error;
+        await reset(resetOther: true);
+        return;
       }
 
       final user = UserPayload.fromJson(data);
+      if (user.status == UserStatus.kDisabled) {
+        await reset(resetOther: true);
+        return;
+      }
       _parseAndUpdateUser(user);
+      final now = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+      await bind.mainSetLocalOption(key: 'rw-token-validated-at', value: now);
+      await bind.mainSetOption(key: 'rw-token-validated-at', value: now);
+      await bind.mainSetOption(key: 'rw-login-ok', value: 'Y');
+      _offlinePoll = false;
+      await _setApiReachable(true);
     } catch (e) {
       debugPrint('Failed to refreshCurrentUser: $e');
-      // Surface failures in the address book / group tabs, which offer a
-      // retry. Anything not flagged above -- transport errors, non-JSON or
-      // unexpected-schema bodies (e.g. a filter's block page) -- keeps the
-      // check-your-network tip.
       if (networkError.value.isEmpty) {
         networkError.value = e.toString();
       }
+      _offlinePoll = true;
+      if (!_withinConfirmTtl()) {
+        await _setApiReachable(false);
+      }
     } finally {
       refreshingUser = false;
-      await updateOtherModels();
+      if (isLogin) {
+        await updateOtherModels();
+      }
     }
   }
 
@@ -135,9 +179,16 @@ class UserModel {
     }
   }
 
+  Future<void> _setApiReachable(bool? ok) async {
+    final v = ok == null ? '' : (ok ? 'Y' : 'N');
+    await bind.mainSetLocalOption(key: 'rw-api-reachable', value: v);
+    await bind.mainSetOption(key: 'rw-api-reachable', value: v);
+  }
+
   Future<void> reset({bool resetOther = false}) async {
     await bind.mainSetLocalOption(key: 'access_token', value: '');
     await bind.mainSetLocalOption(key: 'user_info', value: '');
+    await _setApiReachable(null);
     if (resetOther) {
       await gFFI.abModel.reset();
       await gFFI.groupModel.reset();
@@ -207,6 +258,8 @@ class UserModel {
       rethrow;
     }
     if (resp.statusCode != 200) {
+      // Disabled account: HTTP 400 {"error":"UserDisabled"} — gate translates
+      // this to «Аккаунт отключён администратором».
       throw RequestException(resp.statusCode, body['error'] ?? '');
     }
     if (body['error'] != null) {

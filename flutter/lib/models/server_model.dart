@@ -246,14 +246,19 @@ class ServerModel with ChangeNotifier {
     }
     var stopped = await mainGetBoolOption(kOptionStopService);
     final oldPwdText = _serverPasswd.text;
-    if (stopped ||
-        verificationMethod == kUsePermanentPassword ||
-        _approveMode == 'click') {
+    if (stopped || _approveMode == 'click') {
       _serverPasswd.text = '-';
     } else {
-      if (_serverPasswd.text != temporaryPassword &&
-          temporaryPassword.isNotEmpty) {
-        _serverPasswd.text = temporaryPassword;
+      // C8: show the encrypted-at-rest permanent password, never a one-time.
+      String shown = '';
+      try {
+        shown = bind.mainGetCommonSync(key: 'permanent-password-plain');
+      } catch (_) {}
+      if (shown.isEmpty) {
+        shown = '••••••••';
+      }
+      if (_serverPasswd.text != shown) {
+        _serverPasswd.text = shown;
       }
     }
     if (oldPwdText != _serverPasswd.text) {

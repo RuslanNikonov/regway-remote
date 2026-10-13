@@ -157,8 +157,15 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/
+    - assets/session/
 
   fonts:
+    - family: Unbounded
+      fonts:
+        - asset: fonts/Unbounded-Variable.ttf
+    - family: Manrope
+      fonts:
+        - asset: fonts/Manrope-Variable.ttf
     - family: GestureIcons
       fonts:
         - asset: assets/gestures.ttf

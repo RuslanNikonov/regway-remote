@@ -562,6 +562,21 @@ class QualityMonitor extends StatelessWidget {
   final QualityMonitorModel qualityMonitorModel;
   QualityMonitor(this.qualityMonitorModel);
 
+  Widget _delayRow(QualityMonitorModel qualityMonitorModel) {
+    final delay = qualityMonitorModel.data.delay;
+    if (delay == null) {
+      return _row("Delay", translate('— ms'),
+          rightColor: const Color(0xFFA7ABC9));
+    }
+    // let delay be 0 if fps is 0
+    final fpsEmpty = (qualityMonitorModel.data.fps ?? '')
+        .replaceAll(' ', '')
+        .replaceAll('0', '')
+        .isEmpty;
+    return _row("Delay", '${fpsEmpty ? 0 : delay}ms',
+        rightColor: Colors.green);
+  }
+
   Widget _row(String info, String? value, {Color? rightColor}) {
     return Row(
       children: [
@@ -596,11 +611,7 @@ class QualityMonitor extends StatelessWidget {
                     children: [
                       _row("Speed", qualityMonitorModel.data.speed ?? '-'),
                       _row("FPS", qualityMonitorModel.data.fps ?? '-'),
-                      // let delay be 0 if fps is 0
-                      _row(
-                          "Delay",
-                          "${qualityMonitorModel.data.delay == null ? '-' : (qualityMonitorModel.data.fps ?? "").replaceAll(' ', '').replaceAll('0', '').isEmpty ? 0 : qualityMonitorModel.data.delay}ms",
-                          rightColor: Colors.green),
+                      _delayRow(qualityMonitorModel),
                       _row("Target Bitrate",
                           "${qualityMonitorModel.data.targetBitrate ?? '-'}kb"),
                       _row(

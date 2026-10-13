@@ -17,7 +17,13 @@ import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:window_size/window_size.dart' as window_size;
 
 import '../../common.dart';
+import '../../common/formatter/id_formatter.dart';
 import '../../models/model.dart';
+import '../../regway/quality_pill.dart';
+import '../../regway/session_clock.dart';
+import '../../regway/session_icons.dart';
+import '../../regway/theme.dart';
+import 'dart:ui' show FontFeature;
 import '../../models/platform_model.dart';
 import '../../common/shared_state.dart';
 import './popup_menu.dart';
@@ -324,13 +330,13 @@ class ToolbarState {
 }
 
 class _ToolbarTheme {
-  static const Color blueColor = MyTheme.button;
-  static const Color hoverBlueColor = MyTheme.accent;
-  static Color inactiveColor = Colors.grey[800]!;
-  static Color hoverInactiveColor = Colors.grey[850]!;
+  static const Color blueColor = Color(0xFF38D9FF);
+  static const Color hoverBlueColor = Color(0xFF6BE3FF);
+  static Color inactiveColor = const Color(0xFF16142C);
+  static Color hoverInactiveColor = const Color(0xFF1E1B3A);
 
-  static const Color redColor = Colors.redAccent;
-  static const Color hoverRedColor = Colors.red;
+  static const Color redColor = Color(0xFFFF3D5E);
+  static const Color hoverRedColor = Color(0xFFFF5A75);
   // kMinInteractiveDimension
   static const double height = 20.0;
   static const double dividerHeight = 12.0;
@@ -689,17 +695,14 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
           !_dockingOptionsInitialized.value) {
         return const SizedBox.shrink();
       }
-      // If toolbar is hidden, return empty widget
-      if (hide.value) {
-        return const SizedBox.shrink();
-      }
       final edge = _edge.value;
       final isHorizontal = _isHorizontalEdge(edge);
+      final toolbarHidden = hide.value;
 
       // Measure the live toolbar after every layout so the preview ghost can
       // match its actual footprint (collapsed handle vs expanded toolbar).
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_dragging.isTrue) return;
+        if (_dragging.isTrue || toolbarHidden) return;
         final ro = _toolbarKey.currentContext?.findRenderObject();
         if (ro is RenderBox && ro.hasSize) {
           final s = ro.size;
@@ -707,33 +710,42 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
         }
       });
 
-      final toolbar = Align(
-        alignment: _alignmentForEdge(edge, _fraction.value),
-        child: KeyedSubtree(
-          key: _toolbarKey,
-          child: collapse.isFalse
-              ? _buildToolbar(context, edge, isHorizontal)
-              : _buildDraggableCollapse(context, edge, isHorizontal),
-        ),
-      );
+      final toolbar = toolbarHidden
+          ? const SizedBox.shrink()
+          : Align(
+              alignment: _alignmentForEdge(edge, _fraction.value),
+              child: KeyedSubtree(
+                key: _toolbarKey,
+                child: collapse.isFalse
+                    ? _buildToolbar(context, edge, isHorizontal)
+                    : _buildDraggableCollapse(context, edge, isHorizontal),
+              ),
+            );
 
       // Always return the Stack — even when not dragging — so the toolbar's
       // position in the Element tree stays stable. Wrapping/unwrapping it
       // mid-drag was killing the Draggable's gesture state.
+      // Quality pill sits at the top-right, overlaid on the toolbar strip.
       return Stack(
         fit: StackFit.expand,
         children: [
-          IgnorePointer(
-            child: Obx(() {
-              final pe = _previewEdge.value;
-              final pf = _previewFraction.value;
-              if (!_dragging.isTrue || pe == null || pf == null) {
-                return const SizedBox.shrink();
-              }
-              return _buildDragPreview(context, pe, pf, _toolbarSize.value);
-            }),
-          ),
+          if (!toolbarHidden)
+            IgnorePointer(
+              child: Obx(() {
+                final pe = _previewEdge.value;
+                final pf = _previewFraction.value;
+                if (!_dragging.isTrue || pe == null || pf == null) {
+                  return const SizedBox.shrink();
+                }
+                return _buildDragPreview(context, pe, pf, _toolbarSize.value);
+              }),
+            ),
           toolbar,
+          Positioned(
+            top: 10,
+            right: 12,
+            child: RwQualityPill(id: widget.id, ffi: widget.ffi),
+          ),
         ],
       );
     });
@@ -802,6 +814,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
   Widget _buildToolbar(
       BuildContext context, _ToolbarEdge edge, bool isHorizontal) {
     final List<Widget> toolbarItems = [];
+    toolbarItems.add(_SessionIdentity(id: widget.id, ffi: widget.ffi));
     toolbarItems.add(_PinMenu(state: widget.state));
     toolbarItems.add(Obx(() {
       final privacyModeState = PrivacyModeState.find(widget.id);
@@ -851,7 +864,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     }
     if (!isWeb) toolbarItems.add(_RecordMenu());
     toolbarItems.add(_CloseMenu(id: widget.id, ffi: widget.ffi));
-    final toolbarBorderRadius = BorderRadius.all(Radius.circular(4.0));
+    final toolbarBorderRadius = BorderRadius.all(Radius.circular(12.0));
     // innerAxis: how the toolbar icons themselves flow.
     // outerAxis: how the toolbar block and the handle stack against each other
     // (perpendicular to the dock edge, so the handle hangs off the interior face).
@@ -1031,13 +1044,8 @@ class _MainMonitorSwitchButton extends StatelessWidget {
           child: Stack(
             alignment: const Alignment(0, -0.125),
             children: [
-              SvgPicture.asset(
-                'assets/display_switcher.svg',
-                colorFilter:
-                    const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                width: _ToolbarTheme.buttonSize,
-                height: _ToolbarTheme.buttonSize,
-              ),
+              rwSessionSvg('assets/display_switcher.svg',
+                  color: RwColors.onAccent),
               Text(
                 label,
                 textAlign: TextAlign.center,
@@ -1185,11 +1193,8 @@ class _MonitorMenu extends StatelessWidget {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        SvgPicture.asset(
-                          "assets/screen.svg",
-                          colorFilter:
-                              ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                        ),
+                        rwSessionSvg("assets/screen.svg",
+                            color: RwColors.onAccent),
                         Obx(() => buildOneMonitorButton(i, display.value)),
                       ],
                     ),
@@ -2979,17 +2984,126 @@ class _CloseMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _IconMenuButton(
-      assetName: 'assets/close.svg',
-      tooltip: 'Close',
-      onPressed: () async {
-        if (await showConnEndAuditDialogCloseCanceled(ffi: ffi)) {
-          return;
-        }
-        closeConnection(id: id);
-      },
-      color: _ToolbarTheme.redColor,
-      hoverColor: _ToolbarTheme.hoverRedColor,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: Tooltip(
+        message: translate('Disconnect'),
+        child: InkWell(
+          onTap: () async {
+            if (await showConnEndAuditDialogCloseCanceled(ffi: ffi)) {
+              return;
+            }
+            closeConnection(id: id);
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            decoration: BoxDecoration(
+              color: _ToolbarTheme.redColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              translate('Disconnect'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Manrope',
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SessionIdentity extends StatefulWidget {
+  final String id;
+  final FFI ffi;
+  const _SessionIdentity({required this.id, required this.ffi});
+
+  @override
+  State<_SessionIdentity> createState() => _SessionIdentityState();
+}
+
+class _SessionIdentityState extends State<_SessionIdentity> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    RwSessionClock.markStart(widget.id);
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _elapsed() {
+    final d = RwSessionClock.elapsed(widget.id) ?? Duration.zero;
+    return RwSessionClock.format(d);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final alias = bind.mainGetPeerOptionSync(id: widget.id, key: 'alias');
+    final title = alias.isNotEmpty ? alias : formatID(widget.id);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: const Color(0xFF38D9FF),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                    color: const Color(0xFF38D9FF).withOpacity(0.9),
+                    blurRadius: 8)
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'Unbounded',
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: Color(0xFFEEF0FF),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            formatID(widget.id),
+            style: const TextStyle(
+              fontFamily: 'Manrope',
+              fontSize: 13,
+              color: Color(0xFFA7ABC9),
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '· ${_elapsed()}',
+            style: const TextStyle(
+              fontFamily: 'Manrope',
+              fontSize: 13,
+              color: Color(0xFFA7ABC9),
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -3030,11 +3144,12 @@ class _IconMenuButtonState extends State<_IconMenuButton> {
   Widget build(BuildContext context) {
     assert(widget.assetName != null || widget.icon != null);
     final icon = widget.icon ??
-        SvgPicture.asset(
-          widget.assetName!,
-          colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
-          width: _ToolbarTheme.buttonSize,
-          height: _ToolbarTheme.buttonSize,
+        Center(
+          child: rwSessionSvg(
+            widget.assetName!,
+            color: RwColors.onAccent,
+            size: kRwSessionIconSize,
+          ),
         );
     var button = SizedBox(
       width: widget.width ?? _ToolbarTheme.buttonSize,
@@ -3115,11 +3230,12 @@ class _IconSubmenuButtonState extends State<_IconSubmenuButton> {
   Widget build(BuildContext context) {
     assert(widget.svg != null || widget.icon != null);
     final icon = widget.icon ??
-        SvgPicture.asset(
-          widget.svg!,
-          colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
-          width: _ToolbarTheme.buttonSize,
-          height: _ToolbarTheme.buttonSize,
+        Center(
+          child: rwSessionSvg(
+            widget.svg!,
+            color: RwColors.onAccent,
+            size: kRwSessionIconSize,
+          ),
         );
     final button = SizedBox(
         width: widget.width ?? _ToolbarTheme.buttonSize,
@@ -3768,13 +3884,8 @@ class _MinimizedMonitorSwitchButton extends StatelessWidget {
           child: Stack(
             alignment: const Alignment(0, -0.125),
             children: [
-              SvgPicture.asset(
-                'assets/display_switcher.svg',
-                colorFilter:
-                    ColorFilter.mode(_ToolbarTheme.blueColor, BlendMode.srcIn),
-                width: iconSize,
-                height: iconSize,
-              ),
+              rwSessionSvg('assets/display_switcher.svg',
+                  color: RwColors.onAccent, size: iconSize),
               Text(
                 label,
                 style: const TextStyle(

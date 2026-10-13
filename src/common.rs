@@ -121,6 +121,7 @@ impl Drop for SimpleCallOnReturn {
 }
 
 pub fn global_init() -> bool {
+    crate::crash::install_hooks();
     #[cfg(all(target_os = "linux", feature = "drm"))]
     crate::platform::linux::dispatch_wayland_display_probe();
     #[cfg(target_os = "linux")]
@@ -910,6 +911,10 @@ pub fn username() -> String {
 #[inline(always)]
 #[cfg(not(target_os = "ios"))]
 pub fn whoami_hostname() -> String {
+    let preset = Config::get_option(keys::OPTION_PRESET_DEVICE_NAME);
+    if !preset.is_empty() {
+        return preset;
+    }
     let mut hostname = whoami::fallible::hostname().unwrap_or_else(|_| "localhost".to_string());
     hostname.make_ascii_lowercase();
     hostname
@@ -1993,6 +1998,10 @@ pub fn make_empty_dirs_response_to_json(res: &ReadEmptyDirsResponse) -> String {
 /// 1. Try to send the url scheme from ipc.
 /// 2. If failed to send the url scheme, we open a new main window to handle this url scheme.
 pub fn handle_url_scheme(url: String) {
+    if !crate::login_gate::is_session_allowed() {
+        log::warn!("login-gate: ignoring URL scheme (not logged in)");
+        return;
+    }
     #[cfg(not(target_os = "ios"))]
     if let Err(err) = crate::ipc::send_url_scheme(url.clone()) {
         log::debug!("Send the url to the existing flutter process failed, {}. Let's open a new program to handle this.", err);
@@ -2133,13 +2142,21 @@ pub fn check_process(arg: &str, mut same_uid: bool) -> bool {
         if same_uid && p.user_id() != my_uid {
             continue;
         }
-        // on mac, p.cmd() get "/Applications/RustDesk.app/Contents/MacOS/RustDesk", "XPC_SERVICE_NAME=com.carriez.RustDesk_server"
+        // launchd on macOS often hides `--server`. sysinfo then reports
+        // argv as the binary plus `XPC_SERVICE_NAME=com.carriez.<App>_server`.
+        // Matching only argv[1] makes the root watchdog think the server is
+        // down and `kickstart -k` it forever.
         let parg = if p.cmd().len() <= 1 { "" } else { &p.cmd()[1] };
+        let args_match = p.cmd().iter().any(|c| c == arg);
+        let launched_server = arg == "--server"
+            && p.cmd().iter().any(|c| {
+                c.contains("XPC_SERVICE_NAME=") && c.ends_with("_server")
+            });
         if arg.is_empty() {
             if !parg.starts_with("--") {
                 return true;
             }
-        } else if arg == parg {
+        } else if arg == parg || args_match || launched_server {
             return true;
         }
     }

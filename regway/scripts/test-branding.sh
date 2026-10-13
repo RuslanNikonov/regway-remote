@@ -3,7 +3,10 @@
 # Использование: scripts/test-branding.sh [RUSTDESK_DIR]   (ключ — фиктивный, формата ed25519)
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"; SRC="$(cd "${1:-$HERE/rustdesk}" && pwd)"
+# shellcheck source=hbbs-key.sh
+source "$HERE/scripts/hbbs-key.sh"
 FK="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="   # фиктивный ключ правильного формата
+EK="$EXPECTED_HBBS_PUB_KEY"                         # реальный публичный ключ hbbs (не секрет)
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 pass=0; failn=0
 fresh() { rm -rf "$TMP/rd"; cp -r "$SRC" "$TMP/rd"; (cd "$TMP/rd" && git checkout -q . && git clean -qfdx -e target && { [ -d libs/hbb_common/.git ] && git -C libs/hbb_common checkout -q . || true; }); }
@@ -16,7 +19,8 @@ t() { # name expected_rc env...
   printf '%-4s %-34s rc=%s  %s\n' "$ok" "$n" "$rc" "$(rg -m1 'ОШИБКА|KEY не|FAIL|branding: OK' "$TMP/o" | cut -c1-110)"
 }
 t default_no_require           0
-t strict_ok                    0 KEY=$FK REQUIRE_REAL_KEY=1
+t strict_ok                    0 KEY=$EK REQUIRE_REAL_KEY=1
+t strict_wrong_key             1 KEY=$FK REQUIRE_REAL_KEY=1
 t strict_placeholder_key       1 REQUIRE_REAL_KEY=1
 t strict_id_other_host         1 KEY=$FK REQUIRE_REAL_KEY=1 ID_SERVER=remote2.regway.group
 t strict_id_via_RENDEZVOUS     1 KEY=$FK REQUIRE_REAL_KEY=1 RENDEZVOUS_SERVER=evil.example.net
@@ -36,21 +40,36 @@ bash "$HERE/scripts/apply-branding.sh" "$TMP/rd" >/dev/null 2>&1; h2=$(cd "$TMP/
 fresh; bash "$HERE/scripts/check-branding.sh" "$TMP/rd" >/dev/null 2>&1 && { echo "FAIL check on pristine passed"; failn=$((failn+1)); } || { echo "PASS check on pristine fails"; pass=$((pass+1)); }
 # After branding: no :21114 / http://remote.regway.group in built sources; host branch uses https
 fresh
-KEY=$FK bash "$HERE/scripts/apply-branding.sh" "$TMP/rd" >/dev/null 2>&1
+KEY=$EK bash "$HERE/scripts/apply-branding.sh" "$TMP/rd" >/dev/null 2>&1
 if grep -q 'host.eq_ignore_ascii_case("remote.regway.group")' "$TMP/rd/src/common.rs" \
    && grep -q 'HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from(\[("api-server"' "$TMP/rd/libs/hbb_common/src/config.rs" \
+   && grep -q 'pub const CHECK_INTERVAL: Duration = Duration::from_secs(30);' "$TMP/rd/src/login_gate.rs" \
+   && grep -q 'fn http_401_unauthorized_revokes' "$TMP/rd/src/login_gate.rs" \
    && [ -f "$TMP/rd/libs/portable/src/res/label.png" ] \
    && ! grep -R -F -n ':21114' --include='*.rs' --include='*.dart' "$TMP/rd/src" "$TMP/rd/libs" "$TMP/rd/flutter/lib" >/dev/null 2>&1 \
    && ! grep -R -F -n 'http://remote.regway.group' --include='*.rs' --include='*.dart' "$TMP/rd/src" "$TMP/rd/libs" "$TMP/rd/flutter/lib" >/dev/null 2>&1; then
-  echo "PASS branded tree has https API host branch, label.png, no :21114/http://remote.regway.group"; pass=$((pass+1))
+  echo "PASS branded tree has https API host branch, login-gate, label.png, no :21114/http://remote.regway.group"; pass=$((pass+1))
 else
   echo "FAIL branded tree still has :21114 or missing host branch/label.png"; failn=$((failn+1))
 fi
 # check-branding must fail if http://host:21114 is reintroduced
 printf '\nfn _regway_poison() { let _ = "http://remote.regway.group:21114"; }\n' >> "$TMP/rd/src/common.rs"
-if KEY=$FK REQUIRE_REAL_KEY=1 bash "$HERE/scripts/check-branding.sh" "$TMP/rd" >/dev/null 2>&1; then
+if KEY=$EK REQUIRE_REAL_KEY=1 bash "$HERE/scripts/check-branding.sh" "$TMP/rd" >/dev/null 2>&1; then
   echo "FAIL check-branding missed :21114 poison"; failn=$((failn+1))
 else
   echo "PASS check-branding rejects :21114 / http://remote.regway.group"; pass=$((pass+1))
+fi
+# check-key-in-binary: match / miss, never requires printing the key
+printf '%s' "$EK" >"$TMP/with-key.bin"
+if bash "$HERE/scripts/check-key-in-binary.sh" "$TMP/with-key.bin" >/dev/null 2>&1; then
+  echo "PASS key-in-binary finds expected key"; pass=$((pass+1))
+else
+  echo "FAIL key-in-binary missed expected key"; failn=$((failn+1))
+fi
+printf 'not-the-hbbs-key' >"$TMP/without-key.bin"
+if bash "$HERE/scripts/check-key-in-binary.sh" "$TMP/without-key.bin" >/dev/null 2>&1; then
+  echo "FAIL key-in-binary passed on a file without the key"; failn=$((failn+1))
+else
+  echo "PASS key-in-binary rejects binary without the key"; pass=$((pass+1))
 fi
 echo "== $pass passed, $failn failed"; [ $failn = 0 ]

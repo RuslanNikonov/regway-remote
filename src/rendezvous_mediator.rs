@@ -279,6 +279,7 @@ impl RendezvousMediator {
             }
         }
         crate::hbbs_http::sync::start();
+        crate::login_gate::start_periodic_check();
         #[cfg(target_os = "windows")]
         if crate::platform::is_installed() && crate::is_server() {
             crate::updater::start_auto_update();
@@ -307,6 +308,8 @@ impl RendezvousMediator {
             let timeout = Arc::new(RwLock::new(CONNECT_TIMEOUT));
             let conn_start_time = Instant::now();
             *SOLVING_PK_MISMATCH.lock().await = "".to_owned();
+            // Register with hbbs at boot, same as 2113bcb. Login-gate still
+            // refuses incoming/outgoing sessions until a token is valid.
             if !config::option2bool("stop-service", &Config::get_option("stop-service"))
                 && !crate::platform::installing_service()
             {
