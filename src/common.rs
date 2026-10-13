@@ -2142,13 +2142,21 @@ pub fn check_process(arg: &str, mut same_uid: bool) -> bool {
         if same_uid && p.user_id() != my_uid {
             continue;
         }
-        // on mac, p.cmd() get "/Applications/RustDesk.app/Contents/MacOS/RustDesk", "XPC_SERVICE_NAME=com.carriez.RustDesk_server"
+        // launchd on macOS often hides `--server`. sysinfo then reports
+        // argv as the binary plus `XPC_SERVICE_NAME=com.carriez.<App>_server`.
+        // Matching only argv[1] makes the root watchdog think the server is
+        // down and `kickstart -k` it forever.
         let parg = if p.cmd().len() <= 1 { "" } else { &p.cmd()[1] };
+        let args_match = p.cmd().iter().any(|c| c == arg);
+        let launched_server = arg == "--server"
+            && p.cmd().iter().any(|c| {
+                c.contains("XPC_SERVICE_NAME=") && c.ends_with("_server")
+            });
         if arg.is_empty() {
             if !parg.starts_with("--") {
                 return true;
             }
-        } else if arg == parg {
+        } else if arg == parg || args_match || launched_server {
             return true;
         }
     }

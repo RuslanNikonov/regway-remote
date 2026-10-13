@@ -64,8 +64,48 @@ fn agent_label() -> String {
     format!("com.carriez.{}_server", crate::get_app_name())
 }
 
+/// `launchctl print` says the GUI agent is already running.
+/// `kickstart -k` must not be used here: it kills that process.
+fn gui_agent_running(uid: &str) -> bool {
+    if uid.is_empty() || uid == "0" {
+        return false;
+    }
+    if crate::check_process("--server", false) {
+        return true;
+    }
+    let target = format!("gui/{uid}/{}", agent_label());
+    let Ok(out) = Command::new("launchctl").args(["print", &target]).output() else {
+        return false;
+    };
+    if !out.status.success() {
+        return false;
+    }
+    String::from_utf8_lossy(&out.stdout).lines().any(|line| {
+        let line = line.trim();
+        line.starts_with("state =")
+            && line.split('=').nth(1).is_some_and(|v| v.trim() == "running")
+    })
+}
+
+fn server_spawn_allowed() -> bool {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static LAST_MS: AtomicU64 = AtomicU64::new(0);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let prev = LAST_MS.load(Ordering::Relaxed);
+    if now.saturating_sub(prev) < 15_000 {
+        return false;
+    }
+    LAST_MS.store(now, Ordering::Relaxed);
+    true
+}
+
 /// After login, make sure the user `--server` process exists.
-/// LaunchAgent should start it; if it is missing we kickstart then spawn.
+/// LaunchAgent should start it. Never `kickstart -k`: that flag kills a
+/// running server, and the service watchdog calls this whenever it cannot
+/// see `--server` in argv.
 pub fn ensure_server_after_login() {
     if hbb_common::config::option2bool(
         "stop-service",
@@ -76,27 +116,30 @@ pub fn ensure_server_after_login() {
     if is_prelogin() {
         return;
     }
-    if crate::check_process("--server", false) {
+    let uid = get_active_userid();
+    if gui_agent_running(&uid) {
         return;
     }
-    let uid = get_active_userid();
     let label = agent_label();
     let plist = agent_plist_path();
     if !uid.is_empty() && uid != "0" {
-        let gui = format!("gui/{uid}/{label}");
         let _ = Command::new("launchctl")
             .args(["bootstrap", &format!("gui/{uid}"), &plist])
             .status();
+        // No `-k`: start the job if it is stopped, leave a live one alone.
         let _ = Command::new("launchctl")
-            .args(["kickstart", "-k", &gui])
+            .args(["kickstart", &format!("gui/{uid}/{label}")])
             .status();
     } else {
         let _ = Command::new("launchctl")
             .args(["load", "-w", &plist])
             .status();
     }
-    if crate::check_process("--server", false) {
+    if gui_agent_running(&uid) {
         log::info!("--server is running after launchctl kickstart");
+        return;
+    }
+    if !server_spawn_allowed() {
         return;
     }
     match run_as_user(vec!["--server"]) {
@@ -853,17 +896,27 @@ pub fn start_os_service() {
     crate::updater::start_auto_update_macos();
     std::thread::spawn(|| {
         let mut last_uid = "".to_owned();
+        let mut missing_ticks = 0u32;
         loop {
             let uid = get_active_userid();
             if uid != last_uid {
                 log::info!("active uid: {uid}");
                 last_uid = uid.clone();
+                missing_ticks = 0;
                 if !uid.is_empty() && uid != "0" {
                     ensure_server_after_login();
                 }
             } else if !uid.is_empty() && uid != "0" && !crate::check_process("--server", false)
             {
-                ensure_server_after_login();
+                // SERVICE_INTERVAL is 300ms. Starting the server on every tick
+                // relaunches the session process several times a second.
+                missing_ticks = missing_ticks.saturating_add(1);
+                if missing_ticks >= 10 {
+                    missing_ticks = 0;
+                    ensure_server_after_login();
+                }
+            } else {
+                missing_ticks = 0;
             }
             std::thread::sleep(std::time::Duration::from_millis(super::SERVICE_INTERVAL));
         }

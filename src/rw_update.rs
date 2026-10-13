@@ -411,8 +411,15 @@ async fn pump_once() {
         }
         "ready" => {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            if current_mode() == "auto" && crate::updater::has_no_active_conns() {
-                STATUS.lock().unwrap().state = "installing".into();
+            {
+                let seq = STATUS.lock().unwrap().sequence;
+                if already_launched(seq) {
+                    // Same payload was already handed to the OS. Do not open
+                    // the dmg or spawn the exe again on the next poll.
+                    STATUS.lock().unwrap().state = "idle".into();
+                } else if current_mode() == "auto" && crate::updater::has_no_active_conns() {
+                    STATUS.lock().unwrap().state = "installing".into();
+                }
             }
         }
         "installing" => {
@@ -588,7 +595,26 @@ fn file_sha256(path: &std::path::Path) -> ResultType<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+fn launched_seq_key() -> &'static str {
+    "rw-update-launched-seq"
+}
+
+fn already_launched(seq: u64) -> bool {
+    seq > 0 && LocalConfig::get_option(launched_seq_key()) == seq.to_string()
+}
+
+fn mark_launched(seq: u64) {
+    if seq > 0 {
+        LocalConfig::set_option(launched_seq_key().into(), seq.to_string());
+    }
+}
+
 fn install_once() -> ResultType<()> {
+    let seq = STATUS.lock().unwrap().sequence;
+    if already_launched(seq) {
+        STATUS.lock().unwrap().state = "idle".into();
+        return Ok(());
+    }
     let file: ManifestFile = serde_json::from_str(&LocalConfig::get_option("rw-update-file"))?;
     if LocalConfig::get_option("rw-update-rollback") == "N" {
         // installing a newer sequence is always allowed; this flag only blocks
@@ -599,12 +625,17 @@ fn install_once() -> ResultType<()> {
     if !path.is_file() {
         bail!("update file missing");
     }
+    // Persist before launching so a restart of this process does not open
+    // the same dmg or exe again. Windows has no kickstart -k loop; spawning
+    // the payload on every ready poll would still re-run the installer.
+    mark_launched(seq);
     #[cfg(target_os = "macos")]
     {
         clear_quarantine(&path);
-        // Open the dmg; the user / installer copies the app. Then bounce the service.
+        // Open the dmg so the user can copy the app. Do not kickstart -k:
+        // that kills the running session server, and a fresh process would
+        // see the same file as "ready" and kill it again.
         let _ = std::process::Command::new("open").arg(&path).status();
-        restart_mac_service();
     }
     #[cfg(target_os = "windows")]
     {
@@ -624,21 +655,6 @@ fn clear_quarantine(path: &std::path::Path) {
         .args(["-r", "-d", "com.apple.quarantine"])
         .arg(path)
         .status();
-}
-
-#[cfg(target_os = "macos")]
-fn restart_mac_service() {
-    let app = crate::get_app_name();
-    let label = format!("com.regway.remote.service");
-    let _ = std::process::Command::new("launchctl")
-        .args(["kickstart", "-k", &format!("gui/{}/{label}", users_uid(),)])
-        .status();
-    let _ = app;
-}
-
-#[cfg(target_os = "macos")]
-fn users_uid() -> u32 {
-    unsafe { hbb_common::libc::getuid() }
 }
 
 fn fail(msg: &str) {

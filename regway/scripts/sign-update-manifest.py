@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build and ed25519-sign updates/manifest.json for RegWay Remote.
 
-Reads UPDATE_SIGNING_KEY from the environment (base64 of a 32-byte seed or
-64-byte ed25519 secret key). Never prints the key. Exits non-zero if the
-secret is missing or signing fails.
+Reads UPDATE_SIGNING_KEY from the environment: a PKCS8 Ed25519 PEM, a
+base64 32-byte seed, or a base64 64-byte secret key. Never prints the key.
+Exits non-zero if the secret is missing or signing fails.
 """
 from __future__ import annotations
 
@@ -32,21 +32,70 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+# PKCS8 Ed25519: SEQUENCE { version, AlgorithmIdentifier(OID 1.3.101.112), OCTET STRING { OCTET STRING seed } }
+_ED25519_PKCS8_PREFIX = bytes.fromhex("302e020100300506032b657004220420")
+
+
+def _seed_from_material(key: bytes) -> bytes:
+    if key.startswith(_ED25519_PKCS8_PREFIX) and len(key) == len(_ED25519_PKCS8_PREFIX) + 32:
+        return key[-32:]
+    if len(key) == 64:
+        return key[:32]
+    if len(key) == 32:
+        return key
+    fail(
+        "UPDATE_SIGNING_KEY must be a 32-byte seed, a 64-byte secret key, "
+        "or a PKCS8 Ed25519 PEM"
+    )
+    return b""  # unreachable
+
+
 def load_secret() -> bytes:
     raw = os.environ.get("UPDATE_SIGNING_KEY", "")
     # Do not log the value. Treat whitespace-only as missing.
     if not raw or not raw.strip():
         fail("UPDATE_SIGNING_KEY is not set")
+    text = raw.strip()
+    if "BEGIN" in text and "PRIVATE KEY" in text:
+        body = "".join(
+            line.strip() for line in text.splitlines() if "-----" not in line and line.strip()
+        )
+        try:
+            der = base64.b64decode(body, validate=False)
+        except Exception:
+            fail("UPDATE_SIGNING_KEY PEM is not valid base64")
+        return _seed_from_material(der)
     try:
-        key = base64.b64decode(raw.strip(), validate=False)
+        key = base64.b64decode(text, validate=False)
     except Exception:
         fail("UPDATE_SIGNING_KEY is not valid base64")
-    if len(key) == 64:
-        return key[:32]
-    if len(key) == 32:
-        return key
-    fail("UPDATE_SIGNING_KEY must decode to 32 or 64 bytes")
-    return b""  # unreachable
+    return _seed_from_material(key)
+
+
+def assert_client_pubkey(seed: bytes) -> None:
+    """Refuse to publish a manifest the installed client cannot verify."""
+    pub = ""
+    try:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+            Ed25519PrivateKey,
+        )
+
+        raw = (
+            Ed25519PrivateKey.from_private_bytes(seed)
+            .public_key()
+            .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        )
+        pub = base64.b64encode(raw).decode("ascii")
+    except ImportError:
+        try:
+            from nacl.signing import SigningKey
+
+            pub = base64.b64encode(bytes(SigningKey(seed).verify_key)).decode("ascii")
+        except ImportError:
+            return
+    if pub != PUBKEY_B64:
+        fail("UPDATE_SIGNING_KEY does not match the client public key")
 
 
 def sign_ed25519(seed: bytes, message: bytes) -> bytes:
@@ -108,6 +157,7 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
 
     seed = load_secret()
+    assert_client_pubkey(seed)
     version = os.environ.get("VERSION", "1.5.0")
     try:
         sequence = int(os.environ.get("UPDATE_SEQUENCE") or os.environ.get("GITHUB_RUN_NUMBER") or "1")
