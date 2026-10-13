@@ -5,7 +5,7 @@ use hbb_common::{
     config::LocalConfig,
     log,
     sodiumoxide::{base64, crypto::sign},
-    ResultType,
+    tokio, ResultType,
 };
 use serde_derive::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -183,7 +183,7 @@ pub fn verify_manifest_sig(body: &[u8], sig_b64: &str, key_id: &str) -> ResultTy
     let pk = sign::PublicKey::from_slice(&pk_bytes).ok_or_else(|| anyhow!("public key length"))?;
     let sig_bytes = base64::decode(sig_b64.trim(), base64::Variant::Original)
         .map_err(|_| anyhow!("bad signature encoding"))?;
-    let sig = sign::Signature::from_slice(&sig_bytes).ok_or_else(|| anyhow!("signature length"))?;
+    let sig = sign::Signature::from_bytes(&sig_bytes).map_err(|_| anyhow!("signature length"))?;
     if !sign::verify_detached(&sig, body, &pk) {
         bail!("manifest signature mismatch");
     }
@@ -682,7 +682,7 @@ mod tests {
         let (pk, sk) = sign::gen_keypair();
         let body = b"{\"sequence\":1}";
         let sig = sign::sign_detached(body, &sk);
-        let sig_b64 = base64::encode(sig.0, base64::Variant::Original);
+        let sig_b64 = base64::encode(sig.to_bytes(), base64::Variant::Original);
         // Production pubkey is not this pair — verify_manifest_sig must fail.
         verify_manifest_sig(body, &sig_b64, KEY_ID).unwrap_err();
         // Wrong key_id fails before crypto.
